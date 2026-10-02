@@ -12,7 +12,7 @@ window.Scene3D = (function () {
   let canvas, renderer, scene, camera, persp, ortho, app, aspect = 1, ready = false, dom = {};
   const FOV = 36;
   const target = { x: 30, y: 15, z: 18 }; const VIEW0 = { theta: 0.62, phi: 0.98 }; let sph = { r: 150, theta: VIEW0.theta, phi: VIEW0.phi };
-  let staticG, envG, blockG, shadowG, fxG, staticKey = null, blockMeshes = new Map(), pickExtra = [], gizmo = [], hover = null, drag = null, op = null, lastPtr = { x: 0, y: 0 }, annots = [];
+  let staticG, envG, blockG, shadowG, fxG, labelG, flats = [], staticKey = null, blockMeshes = new Map(), pickExtra = [], gizmo = [], hover = null, drag = null, op = null, lastPtr = { x: 0, y: 0 }, annots = [];
   const T3 = (x, y, z) => new THREE.Vector3(x, z, -y);
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const col = (n) => new THREE.Color(css(n) || '#888');
@@ -28,7 +28,7 @@ window.Scene3D = (function () {
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }); renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     scene = new THREE.Scene(); persp = new THREE.PerspectiveCamera(FOV, 1, 0.5, 6000); ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -9000, 9000); camera = app.state.aids.perspective ? persp : ortho;
     scene.add(new THREE.HemisphereLight(0xffffff, 0xe6e4df, 0.95)); const sun = new THREE.DirectionalLight(0xffffff, 0.16); sun.position.set(-70, 120, 50); scene.add(sun);
-    staticG = new THREE.Group(); envG = new THREE.Group(); shadowG = new THREE.Group(); blockG = new THREE.Group(); fxG = new THREE.Group(); scene.add(staticG, envG, shadowG, blockG, fxG);
+    staticG = new THREE.Group(); labelG = new THREE.Group(); envG = new THREE.Group(); shadowG = new THREE.Group(); blockG = new THREE.Group(); fxG = new THREE.Group(); scene.add(staticG, envG, shadowG, blockG, fxG, labelG);
     canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointermove', onMove); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', () => { if (op) cancelOp(); drag = null; });
     canvas.addEventListener('pointerleave', () => { if (!drag && hover) { hover = null; buildFx(); frame(); } });
     canvas.addEventListener('wheel', (e) => { e.preventDefault(); sph.r = Math.min(4000, Math.max(12, sph.r * (1 + e.deltaY * 0.0012))); refresh(false); }, { passive: false });
@@ -42,7 +42,7 @@ window.Scene3D = (function () {
   function resize() { if (!renderer) return; const r = canvas.parentElement.getBoundingClientRect(); const w = Math.max(10, r.width), h = Math.max(10, r.height); renderer.setSize(w, h, false); canvas.style.width = w + 'px'; canvas.style.height = h + 'px'; aspect = w / h; persp.aspect = aspect; persp.updateProjectionMatrix(); frame(); }
   /* orthographic axonometric by default; its frustum follows the orbit distance so zoom, fit and handle sizes behave as before */
   function updateCamera() { camera = app.state.aids.perspective ? persp : ortho; if (camera === ortho) { const hh = sph.r * Math.tan(FOV * Math.PI / 360); ortho.left = -hh * aspect; ortho.right = hh * aspect; ortho.top = hh; ortho.bottom = -hh; ortho.near = -Math.max(600, sph.r * 1.5); ortho.far = sph.r + 2600; ortho.updateProjectionMatrix(); } camera.position.set(target.x + sph.r * Math.sin(sph.phi) * Math.sin(sph.theta), target.y + sph.r * Math.cos(sph.phi), target.z + sph.r * Math.sin(sph.phi) * Math.cos(sph.theta)); camera.up.set(0, 1, 0); camera.lookAt(target.x, target.y, target.z); }
-  function frame() { if (!renderer) return; updateCamera(); renderer.render(scene, camera); placeAnnots(); placeReadout(); placeCompass(); }
+  function frame() { if (!renderer) return; updateCamera(); faceLabels(); renderWithLabels(); placeAnnots(); placeReadout(); placeCompass(); }
   /* the on-screen north arrow turns with the camera */
   function placeCompass() { const el = dom.compass; if (!el || app.state.view !== '3d') return; const s = app.project().site, N = s.north || [0, 1], a = T3(s.w / 2, s.d / 2, 0).project(camera), b = T3(s.w / 2 + N[0] * 20, s.d / 2 + N[1] * 20, 0).project(camera); const ang = Math.atan2((b.x - a.x) * aspect, b.y - a.y); const sv = el.firstElementChild; if (sv) sv.style.transform = `rotate(${(ang * 180 / Math.PI).toFixed(1)}deg)`; }
   function projectBox() { const s = app.project().site; let x0 = 0, y0 = 0, x1 = s.w, y1 = s.d, z1 = 0, z0 = 0; for (const b of app.project().blocks) { if (b.hidden) continue; const bb = window.Form && Form.active(b) ? Form.bounds(b, app.project()) : { x0: b.x, y0: b.y, x1: b.x + b.w, y1: b.y + b.d }; x0 = Math.min(x0, bb.x0); y0 = Math.min(y0, bb.y0); x1 = Math.max(x1, bb.x1); y1 = Math.max(y1, bb.y1); z1 = Math.max(z1, Model.blockTop(b)); z0 = Math.min(z0, b.z0); } return { x0, y0, x1, y1, z0, z1 }; }
@@ -64,22 +64,30 @@ window.Scene3D = (function () {
   function label(text, x, y, z, group = staticG, color) { const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d'); g.font = '500 34px "Inter", sans-serif'; g.fillStyle = color || css('--muted'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 48); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false })); const k = 1.3 * Math.max(0.8, sph.r / 160); sp.scale.set(k * 5.33, k, 1); sp.position.copy(T3(x, y, z)); group.add(sp); }
   /* a street name lying flat on the ground, reading along the street; `ang` is the street direction in plan (radians from +x toward +y) */
   function flatLabel(text, x, y, ang, size = 4, group = staticG, color) { const c = document.createElement('canvas'); c.width = 1024; c.height = 160; const g = c.getContext('2d'); g.font = '600 112px "Inter", sans-serif'; g.fillStyle = color || css('--ink2'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 512, 84);
-    let a = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); if (a > Math.PI / 2 && a < Math.PI * 1.5) a += Math.PI; // keep the text readable from the south
-    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; const m = new THREE.Mesh(new THREE.PlaneGeometry(size * 1024 / 160, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide })); m.rotation.set(-Math.PI / 2, a, 0, 'YXZ'); m.position.copy(T3(x, y, 0.3)); m.renderOrder = 6; group.add(m); }
+    const a = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; const m = new THREE.Mesh(new THREE.PlaneGeometry(size * 1024 / 160, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide })); m.rotation.set(-Math.PI / 2, a, 0, 'YXZ'); m.position.copy(T3(x, y, 0.3)); labelG.add(m); flats.push({ m, a }); }
+  /* every flat label turns to read away from the camera (never upside down), whichever way the view is orbited */
+  function faceLabels() { if (!flats.length) return; const fx = target.x - camera.position.x, fy = -(target.z - camera.position.z); for (const f of flats) { const up = -Math.sin(f.a) * fx + Math.cos(f.a) * fy; f.m.rotation.y = up >= 0 ? f.a : f.a + Math.PI; } }
+  const depthOnly = new THREE.MeshBasicMaterial({ colorWrite: false });
+  /* street names are hidden only where the project's own blocks stand in front of them, never by the surrounding buildings:
+     the scene renders without the labels, the depth buffer is cleared and refilled from the blocks alone, then the labels are drawn against it */
+  function renderWithLabels() { labelG.visible = false; renderer.render(scene, camera); if (!flats.length) return;
+    renderer.autoClear = false; renderer.clearDepth(); const vis = [staticG, envG, shadowG, fxG].map((g) => g.visible); for (const g of [staticG, envG, shadowG, fxG]) g.visible = false; scene.overrideMaterial = depthOnly; renderer.render(scene, camera); scene.overrideMaterial = null;
+    blockG.visible = false; labelG.visible = true; renderer.render(scene, camera); blockG.visible = true; [staticG, envG, shadowG, fxG].forEach((g, i) => { g.visible = vis[i]; }); renderer.autoClear = true; }
   const dispose = (grp) => { grp.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); grp.clear(); };
 
   /* ---------- static layer: ground, streets, parks, surrounding city, site boundary ---------- */
   function buildStatic() {
     const s = app.project().site, cx = app.context(), A = app.state.aids, opacity = A.contextOpacity == null ? 0.6 : A.contextOpacity;
     const key = `${s.parcelIndex}:${s.w}:${s.d}:${opacity}:${A.streetNames}:${A.buildingNames}:${document.documentElement.dataset.theme}:${matchMedia('(prefers-color-scheme: dark)').matches}`;
-    if (key === staticKey) return; staticKey = key; dispose(staticG);
+    if (key === staticKey) return; staticKey = key; dispose(staticG); dispose(labelG); flats = [];
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshLambertMaterial({ color: col('--stage') })); ground.rotation.x = -Math.PI / 2; ground.position.set(s.w / 2, -0.06, -s.d / 2); staticG.add(ground);
     const sitePoly = s.poly || [[0, 0], [s.w, 0], [s.w, s.d], [0, s.d]];
     staticG.add(ringMesh(sitePoly, 0, new THREE.MeshLambertMaterial({ color: col('--site-fill'), side: THREE.DoubleSide })));
     staticG.add(ribbon(sitePoly, 0.06, 0.45, new THREE.MeshBasicMaterial({ color: col('--site-line'), side: THREE.DoubleSide })));
     if (cx && opacity > 0.01) {
       const rpos = []; const strip = (pts, w) => { for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.5) continue; const nx = -(b[1] - a[1]) / L * w / 2, ny = (b[0] - a[0]) / L * w / 2; const P = (x, y) => [x, -0.03, -y]; rpos.push(...P(a[0] + nx, a[1] + ny), ...P(b[0] + nx, b[1] + ny), ...P(b[0] - nx, b[1] - ny), ...P(a[0] + nx, a[1] + ny), ...P(b[0] - nx, b[1] - ny), ...P(a[0] - nx, a[1] - ny)); } };
-      const seen = new Set(), mine = new Set((s.edges || []).filter((e) => e.kind === 's' && e.name).map((e) => e.name)); for (const st of cx.streets) { strip(st.pts, 18); const i = Math.max(0, Math.floor(st.pts.length / 2) - 1), a0 = st.pts[i], a1 = st.pts[Math.min(st.pts.length - 1, i + 1)], mid = st.pts[Math.floor(st.pts.length / 2)]; const nearSite = mid[0] > -14 && mid[0] < s.w + 14 && mid[1] > -14 && mid[1] < s.d + 14; if (A.streetNames && st.name && !seen.has(st.name) && !mine.has(st.name) && !nearSite && Math.hypot(mid[0] - s.w / 2, mid[1] - s.d / 2) < 110) { seen.add(st.name); flatLabel(st.name.replace(/^\d+(-\d+)? /, ''), mid[0], mid[1], Math.atan2(a1[1] - a0[1], a1[0] - a0[0]), 3.2, staticG, css('--muted')); } }
+      const bare = (n) => String(n || '').replace(/^\d+(-\d+)? /, '').trim().toUpperCase(), seen = new Set(), mine = new Set((s.edges || []).filter((e) => e.kind === 's' && e.name).map((e) => bare(e.name))); for (const st of cx.streets) { strip(st.pts, 18); let bi = 0, bd = -1; st.pts.forEach((q, k) => { const dd = Math.hypot(q[0] - s.w / 2, q[1] - s.d / 2); if (dd <= 105 && dd > bd && (q[0] < -14 || q[0] > s.w + 14 || q[1] < -14 || q[1] > s.d + 14)) { bd = dd; bi = k; } }); const i = Math.max(0, Math.min(st.pts.length - 2, bi - (bi === st.pts.length - 1 ? 1 : 0))), a0 = st.pts[i], a1 = st.pts[i + 1], mid = st.pts[bi]; const nearSite = bd < 0; if (A.streetNames && st.name && !seen.has(bare(st.name)) && !mine.has(bare(st.name)) && !nearSite && Math.hypot(mid[0] - s.w / 2, mid[1] - s.d / 2) < 110) { seen.add(bare(st.name)); flatLabel(st.name.replace(/^\d+(-\d+)? /, ''), mid[0], mid[1], Math.atan2(a1[1] - a0[1], a1[0] - a0[0]), 3.2, staticG, css('--muted')); } }
       for (const l of cx.lanes || []) strip(l, 6);
       if (rpos.length) { const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rpos, 3)); rg.computeVertexNormals(); staticG.add(new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ color: col('--street'), side: THREE.DoubleSide }))); }
       const pk = new THREE.MeshLambertMaterial({ color: col('--park'), transparent: true, opacity: 0.6, side: THREE.DoubleSide });

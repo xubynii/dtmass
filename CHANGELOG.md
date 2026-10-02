@@ -41,7 +41,7 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 
 ## Phase 29 (2 Oct 2026): no handles; flat street names
 - The face dots are gone. On the selected block the hovered face highlights with its arrow; pulling that face along the arrow pushes or pulls it, sliding it sideways moves the block, pulling the roof changes the height. Any other block moves when dragged. The floor level still changes only in the side panel.
-- Street names lie flat on the ground, reading along the street: the site's own streets get a large name centred on the block face, 9 m into the street; nearby streets get a smaller muted name at mid-length. Buildings occlude them.
+- Street names lie flat on the ground, reading along the street: the site's own streets get a large name centred on the block face, 9 m into the street; nearby streets get a smaller muted name, placed where the street is farthest from the site. The names turn with the camera so they never read upside down, and only the project's own blocks can hide them (the labels are drawn in a pass of their own against a depth buffer filled from the blocks alone), so a neighbouring tower never covers a street name while the scheme's tower still does. A nearby street already named on a site edge is not named twice.
 
 ## Phase 28 (2 Oct 2026): direct dragging, floors fixed, best typical layout per program
 - No move arrows: dragging the body of any block moves it on its own floor (base elevation never changes by dragging, in 3D or in Section); the selected block shows small face handles (four sides and roof) that push or pull that face. Floor level changes only through the side panel: Base elevation, or the new "Starts at" selector (ground, or the top of a named block).
