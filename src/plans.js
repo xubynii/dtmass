@@ -90,6 +90,7 @@ window.Plans = (function () {
       // prefer opposite faces for two stairs
       let pick = [];
       if (n === 2) { const pairs = c.w >= c.d ? [['E', 'W'], ['N', 'S']] : [['N', 'S'], ['E', 'W']]; const corr = ok.filter((f) => f.code === C.CORR || f.exterior); for (const p of pairs) { const a = (corr.length >= 2 ? corr : ok).find((f) => f.side === p[0]), b = (corr.length >= 2 ? corr : ok).find((f) => f.side === p[1]); if (a && b) { pick = [a, b]; break; } } if (!pick.length) pick = ok.slice(0, 2); }
+      else if (cores.length > 1) { /* a single-stair core puts its door on the face farthest from the other cores, so the two exits are as far apart as the plate allows */ const others = cores.filter((o) => o !== c), far = (f) => Math.min(...others.map((o) => Math.hypot(f.x - (o.x + o.w / 2), f.y - (o.y + o.d / 2)))), corr = ok.filter((f) => f.code === C.CORR || f.exterior); pick = (corr.length ? corr : ok).slice().sort((p, q) => far(q) - far(p)).slice(0, 1); }
       else pick = ok.slice(0, 1);
       if (!pick.length && ok.length === 0) { // no corridor outside: use the face nearest the plate edge anyway, flagged
         pick = faces.slice(0, n); pick.forEach((f) => (f.noAccess = true)); }

@@ -10,6 +10,13 @@ window.Model = (function () {
   let nextId = 1;
   const uid = (p) => `${p}${nextId++}`;
 
+  /* two cores for a tower plate: 7 × 6 m each (one exit stair, elevators, lobby), centred across the plate at a fifth and four fifths of the long side so the exits are well apart */
+  function twoCores(t, z0, top, storeys, name) {
+    const q = (v) => Math.round(v * 4) / 4, along = t.w >= t.d, L = along ? t.w : t.d, S = along ? t.d : t.w;
+    const cl = Math.min(7, Math.max(4, L - 2)), cs = Math.min(6, Math.max(3, S - 2)), lifts = Math.max(1, Math.round((storeys || 10) / 14));
+    const place = (fL, fS) => { const a = Math.min(Math.max(fL * L - cl / 2, 1), L - cl - 1), s = Math.min(Math.max(fS * S - cs / 2, 1), Math.max(1, S - cs - 1)); return along ? { x: q(t.x + a), y: q(t.y + s), w: q(cl), d: q(cs) } : { x: q(t.x + s), y: q(t.y + a), w: q(cs), d: q(cl) }; };
+    return [place(0.2, 0.5), place(0.8, 0.5)].map((r, i) => block(Object.assign({ use: 'core', name: `${name || 'Core'} ${'AB'[i]}`, z0, floors: 1, f2f: Math.round((top - z0) * 100) / 100, stairs: 1, elevators: lifts }, r)));
+  }
   function block(props) {
     const b = Object.assign({ id: uid('b'), use: 'residential', name: '', x: 0, y: 0, w: 20, d: 20, z0: 0, floors: 1, f2f: null, stairs: 2, elevators: 2 }, props);
     if (b.f2f == null) b.f2f = USE_F2F[b.use] || 3.0;
@@ -41,9 +48,8 @@ window.Model = (function () {
       block({ use: 'office', name: 'Office podium', x: 0, y: 0, w: W, d: D, z0: 5.0, floors: 1, f2f: 3.9 }),
       block({ use: 'residential', name: 'Tower', x: tx, y: ty, w: tw, d: td, z0: 8.9, floors, f2f: 3.0 }),
       block({ use: 'parking', name: 'Underground parking', x: 0, y: 0, w: W, d: D, z0: -9.6, floors: 3, f2f: 3.2 }),
-      block({ use: 'core', name: 'Core', x: cx, y: cy, w: cw, d: cd, z0: -9.6, floors: 1, f2f: q(8.9 + floors * 3.0 + 9.6), stairs: 2, elevators: 4 }),
-      block({ use: 'core', name: 'Stair NW', x: 0, y: q(D - 9), w: 3, d: 6, z0: -9.6, floors: 1, f2f: 18.5, stairs: 1, elevators: 0 }),
-      block({ use: 'core', name: 'Stair SE', x: q(Math.max(retailW + 2, W - 14)), y: 0, w: 6, d: 3, z0: -9.6, floors: 1, f2f: 18.5, stairs: 1, elevators: 0 }),
+      /* two cores, each an exit stair with elevators, near opposite ends of the tower plate and running from the lowest parking level to the roof */
+      ...twoCores({ x: tx, y: ty, w: tw, d: td }, -9.6, 8.9 + floors * 3.0, floors, 'Core'),
     ];
     const ramps = [ramp({ x: q(W - 10), y: 0, w: 6.1, len: q(Math.min(34, D - 2)), dir: 'N', zTop: 0, zBottom: -9.6 })];
     return { schema: 1, site, blocks, ramps };
@@ -118,7 +124,7 @@ window.Model = (function () {
     const out = [];
     const siteR = { x: 0, y: 0, w: project.site.w, d: project.site.d };
     const cores = project.blocks.filter((b) => b.use === 'core');
-    if (cores.filter((c) => c.w * c.d >= 30).length > 2) out.push('More than two full cores: extra cores should be small stair cores (under 30 m²).');
+    const nTowers = Math.max(1, project.blocks.filter((b) => b.use !== 'core' && b.use !== 'parking' && !b.hidden && blockTop(b) > 18).length); if (cores.filter((c) => c.w * c.d >= 30).length > 2 * nTowers) out.push(`More than two full cores per tower: extra cores should be small stair cores (under 30 m²).`);
     for (const b of project.blocks) {
       if (b.w < 2 || b.d < 2) out.push(`${b.name}: footprint under 2 m.`);
       if (!rectInside(rect(b), siteR)) out.push(`${b.name}: extends beyond the site.`);
@@ -131,5 +137,5 @@ window.Model = (function () {
   function syncIds(project) { let m = 0; for (const o of [...project.blocks, ...project.ramps]) { const n = parseInt(String(o.id).replace(/^\D+/, ''), 10); if (n > m) m = n; } nextId = Math.max(nextId, m + 1); }
   function snap(v, s = 0.25) { return Math.round(v / s) * s; }
 
-  return { USES, USE_LABEL, USE_F2F, LEVEL_TOL, block, ramp, demoProject, levels, totals, unionArea, problems, clone, syncIds, snap, blockTop, rect, area, slabs, rectsOverlap, rectInside };
+  return { USES, USE_LABEL, USE_F2F, LEVEL_TOL, block, twoCores, ramp, demoProject, levels, totals, unionArea, problems, clone, syncIds, snap, blockTop, rect, area, slabs, rectsOverlap, rectInside };
 })();

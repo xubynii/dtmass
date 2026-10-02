@@ -121,6 +121,8 @@ window.PlanRes = (function () {
         rooms.push(unit);
       }
     }
+    // a sliver too small to be a home (under 30 m²: between two cores, or a leftover at a corner) becomes a storage / service room instead of a unit
+    for (const u of rooms.filter((r) => r.kind === 'unit' && r.area < 30)) { mix.count[u.unitType]--; u.kind = 'service'; u.name = 'Storage'; u.occ = 0; u.bedrooms = 0; delete u._band; }
     // re-type merged / oversize units by area, then furnish rooms
     for (const u of rooms.filter((r) => r.kind === 'unit')) {
       const a = u.area; const T = a >= 95 ? TYPES[3] : a >= 70 ? TYPES[2] : a >= 46 ? TYPES[1] : TYPES[0];
