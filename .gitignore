@@ -1,0 +1,7 @@
+# local test output
+tools/review-*.html
+tools/review-edge/
+docs/codex-write-test.txt
+*.log
+.DS_Store
+Thumbs.db
