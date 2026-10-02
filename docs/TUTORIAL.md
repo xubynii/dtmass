@@ -1,6 +1,6 @@
 # Downtown Massing Tool — a first study in eight steps
 
-Open the live tool: https://xubynii.github.io/dtmass/ (Chrome or Edge, laptop screen). The same steps are under **Help** in the tool, each with a *Show me* link.
+Open the live tool: https://xubynii.github.io/dtmass/ (Chrome or Edge, laptop screen). In the tool, press **Help → Start the interactive tour**: a card walks you through these steps on the real model, waits until you have done each one (or does it for you), and moves on. The tour also starts by itself on a first visit.
 
 1. **Pick your lot.** On **Site**, press *Change site* and click a downtown parcel. Under *Restrictions*, confirm the two items marked "needs verification" (ODP density area and height area); until you do, the checks that depend on them stay at "needs verification".
 2. **Set the target.** On **Design**, open *Development target*: type the floor area you need and the tower floorplate you prefer, and the number of parking levels. The massing regenerates as you type.

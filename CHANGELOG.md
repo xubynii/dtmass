@@ -39,6 +39,9 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 38 (2 Oct 2026): interactive tour
+- Help → *Start the interactive tour* (also `#tour`, and automatic on a first visit): a card above the view takes the user through nine functions on the real model: confirm a restriction, set the target, set the mix, choose a typology, shape by hand, read a check, save a version, change and compare, make the report. Each step opens the right tab and section, highlights the control with a pulsing outline, watches the model and interface state until the action has been done, shows ✓ Done and moves on; *Do it for me* performs the same action through the same handlers the user would use, *Skip* and *Back* move freely, ✕ ends the tour. Regression step: every Do-it-for-me completes its step.
+
 ## Phase 37 (2 Oct 2026): step-by-step tutorial
 - **Help** now opens with *Start here · eight steps*: pick the lot, set the target, set the mix, choose a typology, shape by hand, read the checks, save and compare, make the report. Each step has a *Show me* link that opens the tab and section it talks about (`tutGo` in app.js); step 5 selects the tower, switches to Face mode and puts a try-it hint under the view. The tutorial opens by itself on a first visit (remembered in local storage; never during a hash-driven test run). The Tools and Keyboard parts of Help were rewritten for Face / Mass; the old Push/Pull, Move and Add-block entries are gone.
 - The same eight steps are in `docs/TUTORIAL.md`, linked from the README.

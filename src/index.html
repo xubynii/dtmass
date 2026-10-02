@@ -74,6 +74,12 @@ svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-widt
 .toggle input { margin-top: 3px; flex: none; } .toggle small { color: var(--muted); display: block; font-size: 12px; }
 .pop .sub { margin: 2px 0 6px 26px; font-size: 13px; color: var(--muted); }
 .helpgrid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+.tourcard { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: var(--pop); padding: 12px 16px 12px; z-index: 60; font-size: 13px; line-height: 1.45; }
+.tourcard[hidden] { display: none; } .tourcard .tc-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.tourcard h4 { margin: 4px 0 4px; font-size: 14.5px; font-weight: 600; } .tourcard p { margin: 0 0 8px; color: var(--ink2); } .tourcard .tc-status { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 8px; } .tourcard .tc-status.ok { color: var(--pass); font-weight: 600; }
+.tourcard .tc-btns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; } .tourcard .tc-btns .sp { flex: 1; } .tourcard button.primary { background: var(--accent); color: #fff; border-color: var(--accent); } .tourcard button.primary:disabled { opacity: .45; }
+.tourcard .tc-dots { display: flex; gap: 4px; } .tourcard .tc-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); display: inline-block; } .tourcard .tc-dots i.on { background: var(--accent); } .tourcard .tc-dots i.done { background: var(--pass); }
+.tour-hl { outline: 3px solid var(--accent) !important; outline-offset: 3px; border-radius: 4px; animation: tourPulse 1.4s ease-in-out infinite; } @keyframes tourPulse { 0%, 100% { outline-color: var(--accent); } 50% { outline-color: color-mix(in srgb, var(--accent) 35%, transparent); } }
 .tut { margin: 0; padding-left: 20px; } .tut li { margin: 0 0 9px; font-size: 13px; line-height: 1.4; } .tut li > b { display: block; font-weight: 600; } .tut li span b { font-weight: 600; color: var(--fg); } .tut li span { color: var(--ink2); } .tut .link { padding: 0 0 0 6px; font-size: 12.5px; }
 .menulist button { width: 100%; justify-content: flex-start; border: 0; background: transparent; padding: 6px 8px; }
 .menulist button:hover { background: var(--panel2); }
@@ -466,7 +472,7 @@ button.wide { width: 100%; justify-content: center; min-height: 40px; }
     <div class="popwrap"><button class="ghost" id="btnHelp" aria-haspopup="true" aria-expanded="false" title="Help and shortcuts" data-icon="help">Help</button>
       <div class="pop" id="popHelp" hidden style="width:420px">
         <h4>Start here · eight steps</h4>
-        <p class="hint" style="margin:0 0 10px">A massing study in about ten minutes. Each step has a <b>Show me</b> link that takes you to the right place.</p>
+        <p class="hint" style="margin:0 0 10px">A massing study in about ten minutes. <button id="tourStart" class="small" style="margin:0 2px 0 0">Start the interactive tour</button> and the tool walks you through each step on the real model, or use the <b>Show me</b> links below.</p>
         <ol class="tut">
           <li><b>Pick your lot</b><span>On <b>Site</b>, press <i>Change site</i> and click a downtown parcel. Under <i>Restrictions</i>, confirm the two items marked "needs verification".</span><button class="link" data-tut="site">Show me</button></li>
           <li><b>Set the target</b><span>On <b>Design</b>, open <i>Development target</i>: type the floor area you need and the tower floorplate you prefer. The massing regenerates as you type.</span><button class="link" data-tut="target">Show me</button></li>
@@ -570,6 +576,7 @@ button.wide { width: 100%; justify-content: center; min-height: 40px; }
       <div class="annots" id="annots"></div>
       <div class="readout" id="readout" hidden></div>
       <div class="statusline" id="toolHint" aria-live="polite"></div>
+      <div class="tourcard" id="tourCard" hidden role="dialog" aria-live="polite"></div>
       <div class="compass" id="compass" title="North" aria-label="North arrow"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18"/><path class="nd" d="M20 14l6 17-6-4-6 4z"/><text x="20" y="12">N</text></svg></div>
       <div class="vtc"><div class="seg" role="tablist" aria-label="View"><button data-view="3d">3D</button><button data-view="plan">Plan</button><button data-view="section">Section</button></div><div class="seg" id="pickSeg" role="group" aria-label="What a drag acts on" title="Face: drag a face to push or pull it, click it to type a size · Mass: drag a block to move it on its floor"><button data-pick="face">Face</button><button data-pick="mass">Mass</button></div></div>
       <div class="vtr">
