@@ -2,11 +2,7 @@
 
 ## 1. Purpose
 
-<!-- Write this section yourself (150 words or fewer): what the tool helps someone understand or do, and for whom.
-     Prompts, delete when done:
-     · who: e.g. a designer in the first week of a downtown Vancouver project, before a code consultant is involved
-     · what it helps you understand: how a program brief becomes a tower on a specific lot, and which rule bites first (density, height, floor plate, setbacks, egress, parking)
-     · what it helps you do: try several typologies and program mixes in minutes and keep the reasons for a choice in a report -->
+Downtown Massing Studio helps designers explore a downtown Vancouver tower project before a code consultant is involved. Users choose a program mix and massing typology to see how their brief could fit on a specific lot, then adjust the shape, split floors, and rearrange uses. The tool checks supported building code and planning requirements to identify which constraints need attention first, such as density, height, setbacks, or parking. Designers can test several options quickly and see how each change affects the proposal. A generated report records the comparisons, explains potential compliance issues, and preserves the reasons for choosing one scheme over another, including assumptions and questions that need further review.
 
 ## 2. How to use it
 
