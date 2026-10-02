@@ -1,6 +1,6 @@
 # Downtown Massing Tool
 
-**Live tool:** https://<your-user>.github.io/dtmass/  ← paste the GitHub Pages link here once Pages is enabled (Settings → Pages → Deploy from branch → `main`, folder `/ (root)`).
+**Live tool:** https://xubynii.github.io/dtmass/ · Repository: https://github.com/xubynii/dtmass
 
 A browser tool for downtown Vancouver lots: give it a program brief, get an editable tower massing, and see every number checked live against the Downtown Official Development Plan, the Vancouver Building By-law and the Parking By-law, with each clause linked to its source.
 

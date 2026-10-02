@@ -6,8 +6,8 @@
 
 **Screenshot:** `docs/images/example-design.png` (the 1189 Howe St demo with a podium-and-tower scheme generated from a 24,000 m² brief; the hotel block is selected and the setback planes show in 3D).
 
-**Repository link:** https://github.com/<your-user>/dtmass   ← replace after you create the repo
+**Repository link:** https://github.com/xubynii/dtmass
 
-**Demo link (GitHub Pages):** https://<your-user>.github.io/dtmass/   ← replace after Pages is enabled
+**Demo link (GitHub Pages):** https://xubynii.github.io/dtmass/
 
 Alternative screenshot if the slide needs the checks instead of the model: `docs/images/example-check.png`.
