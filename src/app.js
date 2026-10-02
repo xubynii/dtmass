@@ -10,9 +10,9 @@
   const DEFAULT_SNAP = { inc: 0.25, storeys: true, align: true, constrain: false };
   const UI_KEY = 'dms.ui.v4';
   const stored = (() => { try { const v = JSON.parse(localStorage.getItem(UI_KEY)); if (v) return v; const old = JSON.parse(localStorage.getItem('dms.ui.v3')) || {}; delete old.aids; return old; } catch (e) { return {}; } })();
-  const state = { workspace: stored.workspace || 'design', view: '3d', tool: 'select', pickPair: false, levelKey: null, heat: false, selected: null, issue: null, checkFilter: { status: 'all', group: 'all', block: null }, secAxis: 'x', secPos: 0, highlight: [], focusIds: [],
+  const state = { workspace: stored.workspace || 'design', view: '3d', tool: 'select', pick: stored.pick === 'mass' ? 'mass' : 'face', pickPair: false, levelKey: null, heat: false, selected: null, issue: null, checkFilter: { status: 'all', group: 'all', block: null }, secAxis: 'x', secPos: 0, highlight: [], focusIds: [],
     aids: Object.assign({}, DEFAULT_AIDS, stored.aids || {}), snap: Object.assign({}, DEFAULT_SNAP, stored.snap || {}), lw: stored.lw || null, rw: stored.rw || null, lcollapsed: !!stored.lcollapsed, highlightPark: null, progView: stored.progView || 'occ', editMode: stored.editMode || 'free', secOpen: stored.secOpen || {} };
-  const saveUi = () => { try { localStorage.setItem(UI_KEY, JSON.stringify({ workspace: state.workspace, aids: state.aids, snap: state.snap, lw: state.lw, rw: state.rw, lcollapsed: state.lcollapsed, progView: state.progView, editMode: state.editMode, secOpen: state.secOpen })); } catch (e) { /* no storage */ } };
+  const saveUi = () => { try { localStorage.setItem(UI_KEY, JSON.stringify({ workspace: state.workspace, aids: state.aids, snap: state.snap, lw: state.lw, rw: state.rw, lcollapsed: state.lcollapsed, progView: state.progView, editMode: state.editMode, secOpen: state.secOpen, pick: state.pick })); } catch (e) { /* no storage */ } };
   function exampleProject() { try { if (window.Site && Site.available()) { const hit = Site.search('1189 HOWE')[0]; if (hit) { const ns = Site.siteFromParcel(hit.i); delete ns.frame; const p = Model.demoProject(ns); p.name = 'Howe & Davie tower study'; return p; } } } catch (e) { console.warn('example site', e); } const p = Model.demoProject(); p.name = 'Tower study'; return p; }
   let project = exampleProject();
   let levels = [], plans = {}, rows = [], ctxData = null, ctxKey = null, daylightCache = null, has3d = false, tipText = null;
@@ -224,13 +224,13 @@
 
   /* ---------- viewport chrome ---------- */
   const HINT = {
-    select: { '3d': 'Drag a block to move it on its floor · on the selected block, drag a face to push or pull it and the roof to change the height (click a face to type a size); slide along a face to move the block · drag empty space to orbit', plan: 'Drag a block to move it · drag a handle of the selected block to resize it · drag empty space to pan', section: 'Drag a block to restack it · drag empty space to pan' },
+    select: { '3d': () => (state.pick === 'face' ? '<b>Face</b> · Drag a face of any block to push or pull it (the roof changes the height); click a face to type an exact size · switch to <b>Mass</b> to move blocks · drag empty space to orbit' : '<b>Mass</b> · Drag a block to move it on its floor (the level changes only in the side panel); click to select · switch to <b>Face</b> to push or pull faces · drag empty space to orbit'), plan: 'Drag a block to move it · drag a handle of the selected block to resize it · drag empty space to pan', section: 'Drag a block to restack it · drag empty space to pan' },
     push: { '3d': '<b>Push/Pull</b> · Hover a face, then drag it. The opposite face stays fixed. Click a face to type an exact value.', plan: '<b>Push/Pull</b> · Drag an edge or corner handle of the selected block.', section: '<b>Push/Pull</b> works in 3D and Plan. Section shows heights.' },
     move: { '3d': '<b>Move</b> · Drag an arrow to slide along one axis, or the square to move freely. Size does not change.', plan: '<b>Move</b> · Drag a block across the site.', section: '<b>Move</b> · Drag a block up or down to restack it.' },
   };
   function renderViewChrome() {
     placeCompass2d();
-    document.querySelectorAll('.vtc .seg button').forEach((b) => b.classList.toggle('on', b.dataset.view === state.view));
+    document.querySelectorAll('.vtc .seg[role="tablist"] button').forEach((b) => b.classList.toggle('on', b.dataset.view === state.view)); placeChrome();
     const sel = selected();
     renderHint();
     const uses = Model.USES.filter((u) => project.blocks.some((b) => b.use === u && !b.hidden)), A = state.aids;
@@ -245,7 +245,10 @@
     move: '<svg class="hintfig" viewBox="0 0 96 64" aria-hidden="true"><path d="M22 26l22-8 22 8v22l-22 8-22-8z" fill="var(--panel)" stroke="var(--ink)" stroke-width="1"/><path d="M22 26l22 8 22-8M44 34v22" fill="none" stroke="var(--ink)" stroke-width=".8"/><path d="M44 45l38 -12" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#hintAr2)"/><path d="M44 45l-30 -12" stroke="var(--ink)" stroke-width="1.2" marker-end="url(#hintAr3)"/><rect x="40" y="41" width="8" height="8" fill="var(--accent)" opacity=".5"/><defs><marker id="hintAr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 1L10 5L0 9z" fill="var(--accent)"/></marker><marker id="hintAr3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 1L10 5L0 9z" fill="var(--ink)"/></marker></defs></svg>',
   };
   let hintSeen = (() => { try { return JSON.parse(localStorage.getItem('dms.hintseen.v1')) || {}; } catch (e) { return {}; } })();
-  function renderHint() { $('toolHint').innerHTML = tipText ? esc(tipText) : HINT[state.tool][state.view]; }
+  function renderHint() { placeChrome(); const h = HINT[state.tool][state.view]; $('toolHint').innerHTML = tipText ? esc(tipText) : typeof h === 'function' ? h() : h; const sg = $('pickSeg'); if (sg) { sg.hidden = !(state.view === '3d' && state.tool === 'select'); sg.querySelectorAll('[data-pick]').forEach((b) => b.classList.toggle('on', b.dataset.pick === state.pick)); } }
+  /* the view and Face/Mass segments sit in one row with the toolbar buttons, right-aligned, unless a narrow layout has moved them to the left */
+  function placeChrome() { const vtc = document.querySelector('.vtc'), vtr = document.querySelector('.vtr'); if (!vtc || !vtr) return; if (parseFloat(getComputedStyle(vtc).top) > 20) { vtc.style.right = ''; return; } /* a narrow layout has stacked it under the toolbar */ vtc.style.right = (vtr.offsetWidth + 20) + 'px'; }
+  function setPick(mode) { state.pick = mode === 'mass' ? 'mass' : 'face'; saveUi(); renderHint(); if (has3d) { Scene3D.cancelOp(); Scene3D.refresh(); } }
   function renderSnap() { const sn = state.snap, el = $('popSnap');
     el.innerHTML = `<h4>Snapping</h4><div class="snapgrid"><label style="flex-direction:row;align-items:center;gap:10px">Step <select id="optInc" style="width:auto">${[0.1, 0.25, 0.5, 1, 2].map((v) => `<option value="${v}" ${sn.inc === v ? 'selected' : ''}>${v} m</option>`).join('')}</select></label>
       <label class="toggle"><input type="checkbox" id="optStoreys" ${sn.storeys ? 'checked' : ''}><span>Roof in whole storeys<small>Off: the roof moves freely and changes floor-to-floor</small></span></label>
@@ -714,6 +717,7 @@
     if (inInput || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k === 'o') { rotateSelected(); return; }
+    if (k === 'f' && state.view === '3d' && state.tool === 'select') { setPick(state.pick === 'face' ? 'mass' : 'face'); return; }
     if (e.key === 'Escape' && state.pickPair) { pickPair(false); return; }
     const sel = selected(); if (!sel) return;
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
@@ -739,7 +743,7 @@
     ok('exact final dimension by typing', Math.abs(T().w - 40) < 1e-6 && Math.abs(T().x - x0) < 1e-9, `width ${w1} → ${T().w} (typed final 40)`);
     t = T(); const w2 = t.w; east = Scene3D.screenOf(t.x + t.w, t.y + t.d / 2, t.z0 + 10); ev('pointermove', east, { buttons: 0 }); await wait(20); ev('pointerdown', east); ev('pointerup', east); await wait(30); key('-'); key('2'); key('.'); key('5'); key('Enter'); await wait(80);
     ok('exact offset by typing', Math.abs(T().w - (w2 - 2.5)) < 1e-6, `width ${w2} → ${T().w} (typed offset −2.5)`);
-    t = T(); const bx = t.x, by = t.y, bw = t.w, bd = t.d, bz = t.z0, core0 = project.blocks.find((b) => b.name === 'Core'), cx0 = core0.x; setTool('select'); select(t.id); await wait(60); h0 = H();
+    t = T(); const bx = t.x, by = t.y, bw = t.w, bd = t.d, bz = t.z0, core0 = project.blocks.find((b) => b.name === 'Core'), cx0 = core0.x; setTool('select'); setPick('mass'); select(t.id); await wait(60); h0 = H();
     { const ga = Scene3D.screenOf(t.x + t.w * 0.5, t.y, t.z0 + 10), gt = Scene3D.screenOf(t.x + t.w * 0.5 + 8, t.y, t.z0 + 10); await drag(ga, { x: gt.x, y: gt.y }); }
     ok('drag the block body to move it on its own floor (no arrows)', T().w === bw && T().d === bd && (T().x !== bx || T().y !== by) && T().z0 === bz, `x ${bx} → ${T().x}, y ${by} → ${T().y}, base ${bz} kept, size ${T().w} × ${T().d}`); ok('one undo step for the move', H() === h0 + 1); ok('the core moves with its tower', Math.abs((project.blocks.find((b) => b.name === 'Core').x - cx0) - (T().x - bx)) < 0.02, `core x ${cx0} → ${project.blocks.find((b) => b.name === 'Core').x}`);
     t = T(); const before = JSON.stringify({ x: t.x, y: t.y, w: t.w, d: t.d, floors: t.floors }); setTool('push'); await wait(50); h0 = H(); top = Scene3D.screenOf(t.x + t.w / 2, t.y + t.d / 2, Model.blockTop(t)); ev('pointermove', top, { buttons: 0 }); await wait(20); ev('pointerdown', top); for (let i = 1; i <= 6; i++) { ev('pointermove', { x: top.x, y: top.y - i * 15 }); await wait(10); } key('Escape'); ev('pointerup', { x: top.x, y: top.y - 90 }); await wait(60);
@@ -747,10 +751,11 @@
     const wb = T().w; undo(); await wait(60); ok('undo reverts the last edit', T().x !== undefined && T().w === wb && H() === h0 - 1, `x now ${T().x}`);
     setWorkspace('check'); const f = rows.find((r) => r.verdict === 'fail' && target(r)); if (f) { pickIssue(f.id); showInModel(f); } await wait(60); const cam = has3d ? JSON.stringify(Scene3D.screenOf(0, 0, 0)) + ` ${cv.clientWidth}×${cv.clientHeight}` : ''; setWorkspace('design'); setView('3d'); await wait(80);
     const cam2 = has3d ? JSON.stringify(Scene3D.screenOf(0, 0, 0)) + ` ${cv.clientWidth}×${cv.clientHeight}` : ''; ok('inspect an issue, back to Design, view kept', !!f && state.workspace === 'design' && cam2 === cam, (f ? f.title : 'no issue') + (cam2 === cam ? '' : ` · ${cam} vs ${cam2}`));
-    setTool('select'); await wait(50); select(T().id); await wait(40); t = T(); const w5 = t.w, x5 = t.x, zc5 = t.z0 + t.floors * t.f2f / 2; h0 = H(); let sf = Scene3D.gizmoScreen('x+') || Scene3D.screenOf(t.x + t.w, t.y + t.d / 2, zc5), sf2 = Scene3D.screenOf(t.x + t.w + 4, t.y + t.d / 2, zc5); await drag(sf, sf2);
-    ok('Select tool: drag the east face handle of the selected block to push/pull', T().w > w5 && Math.abs(T().x - x5) < 1e-9 && H() === h0 + 1, `width ${w5} → ${T().w}`);
-    select(null); await wait(40); t = T(); const w6 = t.w, x6 = t.x, y6 = t.y; sf = Scene3D.screenOf(t.x + t.w * 0.4, t.y, t.z0 + 12); await drag(sf, { x: sf.x + 60, y: sf.y });
-    ok('Select tool: drag another block to move it', T().w === w6 && (T().x !== x6 || T().y !== y6) && state.selected === t.id, `x ${x6} → ${T().x}, y ${y6} → ${T().y}`);
+    setTool('select'); { const fb = document.querySelector('#pickSeg [data-pick="face"]'); if (fb) fb.click(); } await wait(50); ok('Face / Mass toggle: the Face button switches the pick mode', state.pick === 'face' && $('pickSeg').querySelector('.on').dataset.pick === 'face'); select(T().id); await wait(40); t = T(); const w5 = t.w, x5 = t.x, zc5 = t.z0 + t.floors * t.f2f / 2; h0 = H(); let sf = Scene3D.gizmoScreen('x+') || Scene3D.screenOf(t.x + t.w, t.y + t.d / 2, zc5), sf2 = Scene3D.screenOf(t.x + t.w + 4, t.y + t.d / 2, zc5); await drag(sf, sf2);
+    ok('Face mode: drag a face of the selected block to push/pull', T().w > w5 && Math.abs(T().x - x5) < 1e-9 && H() === h0 + 1, `width ${w5} → ${T().w}`);
+    select(null); await wait(40); t = T(); { const w7 = t.w, x7 = t.x; const sfa = Scene3D.screenOf(t.x + t.w, t.y + t.d / 2, zc5), sfb = Scene3D.screenOf(t.x + t.w + 4, t.y + t.d / 2, zc5); await drag(sfa, sfb); ok('Face mode: a face of an unselected block pushes too (and selects it)', T().w > w7 && Math.abs(T().x - x7) < 1e-9 && state.selected === t.id, `width ${w7} → ${T().w}`); }
+    setPick('mass'); select(null); await wait(40); t = T(); const w6 = t.w, x6 = t.x, y6 = t.y; sf = Scene3D.screenOf(t.x + t.w * 0.4, t.y, t.z0 + 12); await drag(sf, { x: sf.x - 60, y: sf.y });
+    ok('Mass mode: drag a block to move it', T().w === w6 && (T().x !== x6 || T().y !== y6) && state.selected === t.id, `x ${x6} → ${T().x}, y ${y6} → ${T().y}`);
     undo(); await wait(40); undo(); await wait(60);
     setWorkspace('design'); state.progView = 'stack'; $('blocksSec').open = true; renderDesign(); await wait(40); { const am = project.blocks.find((b) => b.name === 'Amenity'), z00 = am.z0, rowsEl = [...document.querySelectorAll('#blockList .lrow')], src = rowsEl.find((r) => r.dataset.id === am.id), dst = rowsEl[0], dt = new DataTransfer(), rc = dst.getBoundingClientRect(); h0 = H();
       src.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true })); dst.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, clientY: rc.top + 2 })); dst.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, clientY: rc.top + 2 })); await wait(60);
@@ -793,7 +798,7 @@
     document.querySelectorAll('.vtc .seg button').forEach((b) => (b.onclick = () => setView(b.dataset.view)));
     document.querySelectorAll('[data-overlay]').forEach((i) => (i.onchange = () => { state.aids[i.dataset.overlay] = i.checked; saveUi(); renderViewChrome(); drawStage(true); }));
     $('btnSnap').onclick = () => togglePop('popSnap', $('btnSnap'));
-    $('btnFit').onclick = () => { if (state.view === '3d' && has3d) Scene3D.fitProject(true); else { Views.refit(); Views.draw(); } };
+    document.querySelectorAll('#pickSeg [data-pick]').forEach((b) => { b.onclick = () => setPick(b.dataset.pick); }); $('btnFit').onclick = () => { if (state.view === '3d' && has3d) Scene3D.fitProject(true); else { Views.refit(); Views.draw(); } };
     $('btnResetView').onclick = () => { if (state.view === '3d' && has3d) Scene3D.resetView(); else { Views.refit(); Views.draw(); } };
     $('btnLayers').onclick = () => togglePop('popLayers', $('btnLayers')); $('btnHelp').onclick = () => togglePop('popHelp', $('btnHelp')); $('btnSave').onclick = () => togglePop('popSave', $('btnSave'));
     $('saveGo').onclick = doSave; $('saveName').onkeydown = (e) => { if (e.key === 'Enter') doSave(); };
@@ -802,7 +807,7 @@
     $('projName').addEventListener('change', (e) => { const v = e.target.value.trim(); if (v && v !== project.name) { commit(); project.name = v; baseline = Model.clone(project); renderTop(); } });
     $('projName').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     window.addEventListener('keydown', keys);
-    new ResizeObserver(() => drawPreview()).observe($('mapPreviewBtn'));
+    new ResizeObserver(() => drawPreview()).observe($('mapPreviewBtn')); { const vtr = document.querySelector('.vtr'); if (vtr) new ResizeObserver(() => placeChrome()).observe(vtr.parentElement); }
     computeAll(); if (!state.secPos) { const b = sectionBlock(); state.secPos = b ? b.y + b.d / 2 : project.site.d / 2; }
     baseline = Model.clone(project);
     document.querySelectorAll('details.sec[data-key]').forEach((d) => { const k = d.dataset.key; if (k in state.secOpen) d.open = !!state.secOpen[k]; d.addEventListener('toggle', () => { state.secOpen[k] = d.open; saveUi(); }); });

@@ -201,7 +201,7 @@ window.Scene3D = (function () {
       const ol = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(q), new THREE.LineBasicMaterial({ color: acc, depthTest: false })); ol.renderOrder = 9; fxG.add(ol);
     };
     if (op && op.kind === 'push') { const b = pr.blocks.find((x) => x.id === op.id); if (b) showFace(b, op.face, true); }
-    else if (hover && hover.face && (tool() === 'push' || (tool() === 'select' && app.selected() && hover.id === app.selected().id && !app.selected().locked))) { const b = pr.blocks.find((x) => x.id === hover.id); if (b) showFace(b, hover.face, false); }
+    else if (hover && hover.face && (tool() === 'push' || (tool() === 'select' && app.state.pick === 'face'))) { const b = pr.blocks.find((x) => x.id === hover.id); if (b && !b.locked) showFace(b, hover.face, false); }
     if (op) { const s0 = op.start, h0 = s0.use === 'core' ? s0.f2f : s0.floors * s0.f2f; const ghost = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s0.w, h0, s0.d)), new THREE.LineDashedMaterial({ color: col('--muted'), dashSize: 0.8, gapSize: 0.5, depthTest: false, transparent: true, opacity: 0.8 })); ghost.position.set(s0.x + s0.w / 2, s0.z0 + h0 / 2, -(s0.y + s0.d / 2)); ghost.computeLineDistances(); ghost.renderOrder = 7; fxG.add(ghost);
       for (const gd of op.guides || []) { const dm = new THREE.LineDashedMaterial({ color: acc, dashSize: 1, gapSize: 0.7, depthTest: false }); let pts; const s = pr.site;
         if (gd.axis === 'x') pts = [T3(gd.v, -15, 0.1), T3(gd.v, s.d + 15, 0.1), T3(gd.v, gd.y || 0, 0.1), T3(gd.v, gd.y || 0, gd.top || 30)];
@@ -320,8 +320,8 @@ window.Scene3D = (function () {
       if (!sel || sel.id !== hit.id) app.select(hit.id);
       if (b && tool() === 'push' && hit.face) { if (b.locked) { app.tip(`${b.name} is locked. Unlock it in its properties to change it.`); drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } beginPush(b, hit.face); drag = { mode: 'op' }; return; }
       if (b && tool() === 'move') { if (b.locked) { app.tip(`${b.name} is locked. Unlock it in its properties to move it.`); drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } beginMove(b, 'plane'); drag = { mode: 'op' }; return; }
-      /* Select: a drag moves the block on its floor. On the already selected block, pulling a face along its own direction (the arrow shown on hover) pushes or pulls that face instead, and pulling the roof changes the height. A plain click only selects. */
-      if (b && tool() === 'select') { if (b.locked) { drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } const was = !!(sel && sel.id === hit.id); drag = { mode: 'pending', kind: 'move', was, b, face: hit.face, x: e.clientX, y: e.clientY, down: { clientX: e.clientX, clientY: e.clientY } }; return; }
+      /* Select: in Face mode a drag pushes or pulls the face under the pointer (the roof changes the height) and a click opens the typed size; in Mass mode a drag moves the whole block on its floor and a click only selects. */
+      if (b && tool() === 'select') { if (b.locked) { drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } const face = app.state.pick === 'face' && hit.face ? hit.face : null; drag = { mode: 'pending', kind: face ? 'push' : 'move', b, face, x: e.clientX, y: e.clientY, down: { clientX: e.clientX, clientY: e.clientY } }; return; }
       drag = { mode: 'orbit', x: e.clientX, y: e.clientY, moved: false, picked: true }; return; }
     drag = { mode: 'orbit', x: e.clientX, y: e.clientY, moved: false };
   }
@@ -330,13 +330,12 @@ window.Scene3D = (function () {
     if (op && drag && drag.mode === 'op') { dragOp(e); return; }
     if (op) { placeReadout(); return; }
     if (drag && drag.mode === 'pending') { if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return; const d = drag; let kind = d.kind;
-      if (d.was && d.face) { if (d.face === 'top') kind = 'push'; else { const c = faceCentre(d.b, d.face), n = FACE[d.face].n, p0 = screenOf(c[0], c[1], c[2]), p1 = screenOf(c[0] + n[0] * 5, c[1] + n[1] * 5, c[2] + n[2] * 5); const t = d.face === 'x+' || d.face === 'x-' ? [0, 1, 0] : [1, 0, 0], p2 = screenOf(c[0] + t[0] * 5, c[1] + t[1] * 5, c[2]); const nx = p1.x - p0.x, ny = p1.y - p0.y, nl = Math.hypot(nx, ny) || 1, tx = p2.x - p0.x, ty = p2.y - p0.y, tl = Math.hypot(tx, ty) || 1, mx = e.clientX - d.x, my = e.clientY - d.y, ml = Math.hypot(mx, my) || 1; const dn = Math.abs((nx * mx + ny * my) / (nl * ml)), dt = Math.abs((tx * mx + ty * my) / (tl * ml)); /* pushing is the default on a selected face; the block moves only when the drag runs clearly along the face */ kind = dt > 0.85 && dt > dn * 1.6 ? 'move' : 'push'; } }
       ptr(d.down); if (kind === 'push') beginPush(d.b, d.face); else beginMove(d.b, 'plane'); drag = { mode: 'op' }; ptr(e); if (op) dragOp(e); return; }
     if (!drag) { // hover feedback
       let h = null;
       if (!h) { const bh = blockHit(); if (bh) h = { id: bh.id, face: bh.face }; }
       const key = h ? `${h.gizmo || ''}${h.id || ''}${h.face || ''}` : '', prev = hover ? `${hover.gizmo || ''}${hover.id || ''}${hover.face || ''}` : '';
-      const rs = (f) => (f === 'top' ? 'ns-resize' : f === 'x+' || f === 'x-' ? 'ew-resize' : 'ns-resize'); const selNow = app.selected(); canvas.style.cursor = app.state.pickPair ? (h ? 'crosshair' : 'default') : h ? (tool() === 'push' && h.face ? rs(h.face) : tool() === 'select' && h.face === 'top' && selNow && h.id === selNow.id ? 'ns-resize' : tool() === 'move' || tool() === 'select' ? 'move' : 'pointer') : 'grab';
+      const rs = (f) => (f === 'top' ? 'ns-resize' : f === 'x+' || f === 'x-' ? 'ew-resize' : 'ns-resize'); const selNow = app.selected(); canvas.style.cursor = app.state.pickPair ? (h ? 'crosshair' : 'default') : h ? ((tool() === 'push' || (tool() === 'select' && app.state.pick === 'face')) && h.face ? rs(h.face) : tool() === 'move' || tool() === 'select' ? 'move' : 'pointer') : 'grab';
       if (key !== prev) { hover = h; if (h && h.gizmo) buildBlocks(); else buildFx(); frame(); } return; }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; if (Math.abs(dx) + Math.abs(dy) > 1) drag.moved = true; const k = sph.r / 650;
     if (drag.mode === 'orbit') { sph.theta -= dx * 0.006; sph.phi = Math.min(1.5, Math.max(0.12, sph.phi - dy * 0.006)); } else if (drag.mode === 'pan') { const dir = new THREE.Vector3(); camera.getWorldDirection(dir); const fwd = new THREE.Vector3(dir.x, 0, dir.z).normalize(), right = new THREE.Vector3(-fwd.z, 0, fwd.x); target.x += -right.x * dx * k + fwd.x * dy * k; target.z += -right.z * dx * k + fwd.z * dy * k; }
@@ -344,7 +343,7 @@ window.Scene3D = (function () {
   }
   function onUp() {
     const d = drag; drag = null; canvas.style.cursor = 'default';
-    if (d && d.mode === 'pending') { if (d.was && d.face && tool() === 'select') { ptr(d.down); beginPush(d.b, d.face); if (op) { op.entry.active = true; renderReadout(); } } return; }
+    if (d && d.mode === 'pending') { if (d.kind === 'push' && d.face && tool() === 'select') { ptr(d.down); beginPush(d.b, d.face); if (op) { op.entry.active = true; renderReadout(); } } return; }
     if (op) { if (!op.moved && op.kind === 'push') { op.entry.active = true; renderReadout(); app.tip(null); return; } if (op.entry.active) return; commitOp(); return; }
     if (d && d.mode === 'orbit' && !d.moved && !d.picked) app.select(null);
   }
