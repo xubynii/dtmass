@@ -27,31 +27,34 @@ window.PlanComm = (function () {
     const staff = Math.round(openArea / 14); // design staffing 14 m²/person (occupant load for code uses 9.3)
     const want = [];
     const n4 = Math.max(1, Math.ceil(staff / 30)), n10 = Math.max(1, Math.ceil(staff / 80)), nf = Math.max(1, Math.ceil(staff / 25));
+    // washrooms first (3.7.2: water closets by occupant load, two universal rooms sized to the staff count), then the support rooms
+    const wcLen = staff > 160 ? 6.0 : staff > 80 ? 4.8 : 3.6; want.push({ kind: 'wc', name: 'Washroom 1', len: wcLen, occ: 0 }, { kind: 'wc', name: 'Washroom 2', len: wcLen, occ: 0 });
     want.push({ kind: 'pantry', name: 'Pantry', len: OFF.pantry, occ: 4 }, { kind: 'storage', name: 'Storage', len: OFF.storage, occ: 0 });
-    for (let i = 0; i < n10; i++) want.push({ kind: 'meeting10', name: 'Meeting 10', len: OFF.meeting10, occ: 10 });
-    for (let i = 0; i < n4; i++) want.push({ kind: 'meeting4', name: 'Meeting 4', len: OFF.meeting4, occ: 4 });
-    for (let i = 0; i < nf; i++) want.push({ kind: 'focus', name: 'Focus', len: OFF.focus, occ: 1 });
-    // place along the outward faces of the ring, in a band of depth OFF.depth, leaving the open floor beyond
+    for (let i = 0; i < n10; i++) want.push({ kind: 'meeting10', name: `Meeting ${i + 1} (10 p)`, len: OFF.meeting10, occ: 10 });
+    for (let i = 0; i < n4; i++) want.push({ kind: 'meeting4', name: `Huddle ${i + 1} (4 p)`, len: OFF.meeting4, occ: 4 });
+    for (let i = 0; i < nf; i++) want.push({ kind: 'focus', name: `Focus ${i + 1}`, len: OFF.focus, occ: 1 });
+    // place along the outward faces of the ring in a band of depth OFF.depth, one room per band in turn so the support rooms spread around the core instead of filling one side; a second row behind the first only when the first is full
     const bnds = PlanRes.bands(plate, corridors, cores).filter((b) => b.depth >= OFF.depth + 3);
     let qi = 0, placedArea = 0;
-    for (const row of [0, 1]) for (const b of bnds) {
-      if (row === 1 && b.depth < 2 * OFF.depth + 3) continue;
-      const horiz = b.side === 'N' || b.side === 'S', len = horiz ? b.rect.w : b.rect.d, off = row * OFF.depth;
-      // band rect limited to OFF.depth on the corridor side (row 1 sits behind row 0)
-      const base = horiz ? G.R(b.rect.x, b.side === 'S' ? b.rect.y + off : b.rect.y + b.rect.d - OFF.depth - off, b.rect.w, OFF.depth) : G.R(b.side === 'W' ? b.rect.x + off : b.rect.x + b.rect.w - OFF.depth - off, b.rect.y, OFF.depth, b.rect.d);
-      let pos = Math.max(0, (horiz ? b.face[0] - b.rect.x : b.face[0] - b.rect.y));
-      const end = Math.min(len, horiz ? b.face[1] - b.rect.x : b.face[1] - b.rect.y);
-      while (qi < want.length && pos + want[qi].len <= end + 0.01) {
-        const w = want[qi], r = horiz ? G.R(base.x + pos, base.y, w.len, OFF.depth) : G.R(base.x, base.y + pos, OFF.depth, w.len);
-        if (cores.some((c) => G.overlaps(c, r))) { pos += 0.5; continue; }
-        const room = mk(ctx, w.kind, w.name, 'office', r, [doorOn(r, row === 0 ? b.side : opposite(b.side), 0.9)], w.occ); // row 0 opens to the corridor ring, row 1 to the open floor
-        rooms.push(room); grid.fill(room.rect, C.ROOM, rooms.length - 1); placedArea += room.area; pos += w.len; qi++;
-      }
+    for (const row of [0, 1]) {
+      const cur = bnds.filter((b) => row === 0 || b.depth >= 2 * OFF.depth + 3).map((b) => { const horiz = b.side === 'N' || b.side === 'S', len = horiz ? b.rect.w : b.rect.d, off = row * OFF.depth;
+        const base = horiz ? G.R(b.rect.x, b.side === 'S' ? b.rect.y + off : b.rect.y + b.rect.d - OFF.depth - off, b.rect.w, OFF.depth) : G.R(b.side === 'W' ? b.rect.x + off : b.rect.x + b.rect.w - OFF.depth - off, b.rect.y, OFF.depth, b.rect.d);
+        return { b, horiz, base, pos: Math.max(0, horiz ? b.face[0] - b.rect.x : b.face[0] - b.rect.y), end: Math.min(len, horiz ? b.face[1] - b.rect.x : b.face[1] - b.rect.y), full: false }; });
+      let progress = true;
+      while (qi < want.length && progress) { progress = false;
+        for (const c of cur) { if (qi >= want.length || c.full) continue; const w = want[qi]; let placed = false;
+          while (c.pos + w.len <= c.end + 0.01) { const r = c.horiz ? G.R(c.base.x + c.pos, c.base.y, w.len, OFF.depth) : G.R(c.base.x, c.base.y + c.pos, OFF.depth, w.len);
+            if (cores.some((k) => G.overlaps(k, r))) { c.pos += 0.5; continue; }
+            const room = mk(ctx, w.kind, w.name, 'office', r, [doorOn(r, row === 0 ? c.b.side : opposite(c.b.side), 0.9)], w.occ); // row 0 opens to the corridor ring, row 1 to the open floor
+            rooms.push(room); grid.fill(room.rect, C.ROOM, rooms.length - 1); placedArea += room.area; c.pos += w.len; qi++; placed = true; progress = true; break; }
+          if (!placed) c.full = true; } }
       if (qi >= want.length) break;
     }
     if (qi < want.length) flags.push(`Office: ${want.length - qi} support rooms did not fit beside the core; the plate is tight around the core.`);
     const open = mk(ctx, 'open', 'Open office', 'office', G.bboxOf(plate), [], Math.round((openArea - placedArea) / LOAD.office));
-    open.noWalls = true; rooms.push(open);
+    open.noWalls = true; open.area = Math.max(0, openArea - placedArea); rooms.push(open);
+    // label the open floor in its deepest clear zone, away from the core and the support rooms
+    { const deep = bnds.slice().sort((p, q) => q.depth - p.depth)[0]; if (deep) { const horiz = deep.side === 'N' || deep.side === 'S', r = deep.rect, back = OFF.depth + (deep.depth >= 2 * OFF.depth + 3 ? OFF.depth : 0); open.labelAt = horiz ? [r.x + r.w / 2, deep.side === 'S' ? r.y + back + (r.d - back) / 2 : r.y + (r.d - back) / 2] : [deep.side === 'W' ? r.x + back + (r.w - back) / 2 : r.x + (r.w - back) / 2, r.y + r.d / 2]; } }
     // lease depth advice: distance from core ring to glass
     const bb = G.bboxOf(plate), cb = G.bboxOf(corridors), depths = [cb.x - bb.x, bb.x + bb.w - cb.x - cb.w, cb.y - bb.y, bb.y + bb.d - cb.y - cb.d];
     const maxDepth = Math.max(...depths);
