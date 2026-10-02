@@ -10,7 +10,7 @@ Downtown Massing Studio helps designers explore a downtown Vancouver tower proje
 
 The tool is a static web page (HTML and JavaScript, no build step, no account).
 
-**New here?** Press **Help → Start the interactive tour** in the tool: a card walks you through the nine major functions on the real model, waits until you have done each one (or does it for you with *Do it for me*), and moves on. It starts by itself on a first visit. The same steps are written out in [docs/TUTORIAL.md](docs/TUTORIAL.md).
+**New here?** Press **Help → Start the interactive tour** in the tool: a card walks you through the ten major functions on the real model, starting with the choice of lot, waits until you have done each one (or does it for you with *Do it for me*), and moves on. It starts by itself on a first visit. The same steps are written out in [docs/TUTORIAL.md](docs/TUTORIAL.md).
 
 **Online:** open the live link at the top of this README in Chrome or Edge on a laptop-sized screen. The first load fetches about 7 MB (the downtown context model, the City parcel data and the Rhino reader); after that it is cached.
 

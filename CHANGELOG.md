@@ -39,6 +39,9 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 40 (2 Oct 2026): the tour starts with the lot
+- Interactive tour step 1 is now *Pick your lot* (press Change site, click a parcel or search an address; done when the project sits on a different parcel; Do it for me picks a nearby downtown parcel). Confirming the restrictions is step 2, so the tour has ten steps.
+
 ## Phase 39 (2 Oct 2026): repository clean-up
 - Removed modules nothing loads any more: `src/massing.js` and `src/typo.js` (replaced by gen.js and form.js in Phases 21–27), `src/iterate.js` and `src/ledger.js` (replaced by compare.js), and `tools/typo-test.js`. Removed `docs/CONTRACT.md`, the module contract from the first day, which described the old architecture. The raw OpenStreetMap download `docs/osm-raw.json` (5.6 MB) is no longer tracked: `src/osm-data.js` is the processed copy and `tools/fetch-osm.py` regenerates both. Local test output folders are ignored. Nothing the page loads or the tests use was removed; the regression and the plan test pass unchanged.
 
