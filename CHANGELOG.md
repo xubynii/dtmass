@@ -39,6 +39,10 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 36 (2 Oct 2026): the report identifies the cores
+- New report sheet *Cores and exits*: a plan of the footprints with each core named, dimensioned and tied to the west property line and the street line, a section looking north with the cores as full-height bars labelled with their extent, and a table per core (size, position, exit stairs, elevators, extent, the masses it runs through, whether it reaches the roof; a core that stops short is marked red).
+- The project data sheet gains a *Cores and exit stairs* row with the same facts in words; the block schedule shows stairs and lifts for each core; the plan detail names the cores; the key axonometric marks each core on the roof instead of drawing it through the tower walls (the comparison axonometrics do the same).
+
 ## Phase 35 (2 Oct 2026): two cores through every mass
 - Every scheme now starts with two cores, each an exit stair with elevators (7 × 6 m, lifts sized to the storeys served), centred across the tower plate at a fifth and four fifths of its long side so the two exits sit as far apart as the plate allows. The demo and every generated typology use them (`Model.twoCores`); the old single core and the two stair-only cores are gone.
 - Cores run through every mass over their footprint: `fitCores` (app.js) sets each unlocked core from the lowest block it stands in (the parking) to the top of the highest block above it, and re-fits on every change, so a core grows when the tower grows. Typing a height in the panel takes the core out of the automatic fit (a *fit to the masses* link puts it back); a locked core is never touched. The panel also shows the elevator count.
