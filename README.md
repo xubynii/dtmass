@@ -40,7 +40,7 @@ Keyboard: Ctrl+Z / Ctrl+Shift+Z undo and redo, Esc cancels a drag, Alt ignores s
 
 Every clause shown in the tool is a link to the by-law, code section, bulletin or guideline it comes from (`src/links.js` holds the addresses). Transcribed values live in `src/codes.js`.
 
-## 4. One example
+## 4.Example
 
 Input: the demo site **1189 Howe St** (DD, density area M, FSR 3.00, height area 6, 91.4 m basic) with a brief of **24,000 m²**, mix **55% residential · 10% hotel · 15% office · 8% retail · 4% restaurant · 8% amenity**, 620 m² floorplate, two parking levels, typology **Podium + Tower**.
 
