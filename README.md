@@ -1,5 +1,7 @@
 # Downtown Massing Tool
 
+**Live tool:** https://xubynii.github.io/dtmass/ · Repository: https://github.com/xubynii/dtmass
+
 ## 1. Purpose
 
 Downtown Massing Studio helps designers explore a downtown Vancouver tower project before a code consultant is involved. Users choose a program mix and massing typology to see how their brief could fit on a specific lot, then adjust the shape, split floors, and rearrange uses. The tool checks supported building code and planning requirements to identify which constraints need attention first, such as density, height, setbacks, or parking. Designers can test several options quickly and see how each change affects the proposal. A generated report records the comparisons, explains potential compliance issues, and preserves the reasons for choosing one scheme over another, including assumptions and questions that need further review.
