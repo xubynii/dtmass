@@ -74,6 +74,7 @@ svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-widt
 .toggle input { margin-top: 3px; flex: none; } .toggle small { color: var(--muted); display: block; font-size: 12px; }
 .pop .sub { margin: 2px 0 6px 26px; font-size: 13px; color: var(--muted); }
 .helpgrid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+.tut { margin: 0; padding-left: 20px; } .tut li { margin: 0 0 9px; font-size: 13px; line-height: 1.4; } .tut li > b { display: block; font-weight: 600; } .tut li span b { font-weight: 600; color: var(--fg); } .tut li span { color: var(--ink2); } .tut .link { padding: 0 0 0 6px; font-size: 12.5px; }
 .menulist button { width: 100%; justify-content: flex-start; border: 0; background: transparent; padding: 6px 8px; }
 .menulist button:hover { background: var(--panel2); }
 dialog { border: 1px solid var(--line); border-radius: 3px; padding: 0; background: var(--panel); color: var(--fg); width: min(980px, 94vw); box-shadow: var(--pop); }
@@ -463,17 +464,27 @@ button.wide { width: 100%; justify-content: center; min-height: 40px; }
     <div class="popwrap"><button class="primary" id="btnSave" data-icon="save" aria-haspopup="true" aria-expanded="false">Save version</button>
       <div class="pop" id="popSave" hidden><h4>Save a version</h4><p class="hint" id="saveHint"></p><div class="inline"><input id="saveName" aria-label="Version name"><button class="primary" id="saveGo">Save</button></div><p class="hint" style="margin:8px 0 0">Saved versions can be compared under Compare.</p></div></div>
     <div class="popwrap"><button class="ghost" id="btnHelp" aria-haspopup="true" aria-expanded="false" title="Help and shortcuts" data-icon="help">Help</button>
-      <div class="pop" id="popHelp" hidden style="width:390px">
-        <h4>Working in the studio</h4>
-        <p class="hint">Pick a lot in <b>Site</b>, shape the massing in <b>Design</b>, review <b>Check</b>, save versions and <b>Compare</b> them, and export a <b>Report</b>. Tabs keep your view and selection.</p>
+      <div class="pop" id="popHelp" hidden style="width:420px">
+        <h4>Start here · eight steps</h4>
+        <p class="hint" style="margin:0 0 10px">A massing study in about ten minutes. Each step has a <b>Show me</b> link that takes you to the right place.</p>
+        <ol class="tut">
+          <li><b>Pick your lot</b><span>On <b>Site</b>, press <i>Change site</i> and click a downtown parcel. Under <i>Restrictions</i>, confirm the two items marked "needs verification".</span><button class="link" data-tut="site">Show me</button></li>
+          <li><b>Set the target</b><span>On <b>Design</b>, open <i>Development target</i>: type the floor area you need and the tower floorplate you prefer. The massing regenerates as you type.</span><button class="link" data-tut="target">Show me</button></li>
+          <li><b>Set the program mix</b><span>Drag the sliders until the bar reads 100%, or press <i>Normalize</i>. Hotel, office, retail and amenity each get their own floors.</span><button class="link" data-tut="mix">Show me</button></li>
+          <li><b>Choose a typology</b><span>Pick Slender Tower, Podium + Tower, Split Towers or Courtyard. The panel shows what was asked against what fits, and names any conflict.</span><button class="link" data-tut="typology">Show me</button></li>
+          <li><b>Shape it by hand</b><span>In the 3D view, <b>Face</b> mode: drag a face to push or pull it, click a face to type a size. <b>Mass</b> mode: drag a block to move it. Blocks stop at the setback and at each other.</span><button class="link" data-tut="edit">Show me</button></li>
+          <li><b>Read the checks</b><span>On <b>Check</b>, every rule shows its current value, the requirement and the clause. <i>Show in model</i> points at the block concerned.</span><button class="link" data-tut="check">Show me</button></li>
+          <li><b>Save and compare</b><span>Press <i>Save version</i>, change something, save again. <b>Compare</b> puts two versions side by side with what improved and what got worse.</span><button class="link" data-tut="compare">Show me</button></li>
+          <li><b>Make the report</b><span>On <b>Report</b>, the sheets build themselves: data sheet, findings, capacity, constraints, moves, fire separations, cores and the appendix. Print to PDF from the browser.</span><button class="link" data-tut="report">Show me</button></li>
+        </ol>
         <h5>Tools</h5>
-        <div class="helpgrid"><b>Select</b><span>Click a block to select it and see its properties.</span><b>Push/Pull</b><span>Hover a face, then drag it. Side faces change width or depth; the roof changes height in whole storeys. Click a face and type a number for an exact Offset or Final dimension.</span><b>Move</b><span>Drag an axis arrow (east–west, north–south) or the square plane handle to reposition the block without resizing it.</span><b>Rotate</b><span>Turns the selected block 90° on the site grid.</span><b>Add block</b><span>Adds a block of the chosen use.</span></div>
+        <div class="helpgrid"><b>Face</b><span>Drag any face to push or pull it; the roof changes height in whole storeys. Click a face to type an exact Offset or Final size.</span><b>Mass</b><span>Drag a block to move it on its own floor. The floor level changes only in the side panel.</span><b>F</b><span>Toggles Face and Mass.</span><b>Shift-click</b><span>Pairs a second block to see the fire separation the two need (or press <i>Pick in model</i> in the side panel).</span></div>
         <h5>While editing</h5>
         <div class="helpgrid"><kbd>0–9</kbd><span>Type an exact value</span><kbd>Tab</kbd><span>Switch Offset / Final</span><kbd>Enter</kbd><span>Apply</span><kbd>Esc</kbd><span>Cancel and restore</span><kbd>Alt</kbd><span>Hold to ignore snapping</span></div>
         <h5>Viewport</h5>
         <div class="helpgrid"><span>Drag empty space</span><span>Orbit (pan in Plan and Section)</span><span>Right-drag</span><span>Pan</span><span>Scroll</span><span>Zoom</span><span>Double-click</span><span>Fit the project</span></div>
         <h5>Keyboard</h5>
-        <div class="helpgrid"><kbd>V</kbd><span>Select</span><kbd>P</kbd><span>Push/Pull</span><kbd>M</kbd><span>Move</span><kbd>O</kbd><span>Rotate 90°</span><kbd>Delete</kbd><span>Delete the selection</span><kbd>Arrows</kbd><span>Nudge by the step (Shift: 10×)</span><kbd>Ctrl+Z</kbd><span>Undo (Ctrl+Shift+Z redo)</span></div>
+        <div class="helpgrid"><kbd>F</kbd><span>Face / Mass</span><kbd>O</kbd><span>Rotate 90°</span><kbd>H</kbd><span>Hide the selection</span><kbd>L</kbd><span>Lock the selection</span><kbd>Delete</kbd><span>Delete the selection</span><kbd>Arrows</kbd><span>Nudge by the step (Shift: 10×)</span><kbd>Ctrl+Z</kbd><span>Undo (Ctrl+Shift+Z redo)</span></div>
         <h5>About the checks</h5>
         <p class="hint" style="margin:0">Screening checks of a massing model against the Downtown ODP, VBBL 2025 Part 3 and Parking By-law 6059. They do not establish compliance. Surrounding buildings © OpenStreetMap contributors (ODbL); site data from the City of Vancouver Open Data Portal.</p>
       </div></div>

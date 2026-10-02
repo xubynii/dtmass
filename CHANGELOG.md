@@ -39,6 +39,10 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 37 (2 Oct 2026): step-by-step tutorial
+- **Help** now opens with *Start here · eight steps*: pick the lot, set the target, set the mix, choose a typology, shape by hand, read the checks, save and compare, make the report. Each step has a *Show me* link that opens the tab and section it talks about (`tutGo` in app.js); step 5 selects the tower, switches to Face mode and puts a try-it hint under the view. The tutorial opens by itself on a first visit (remembered in local storage; never during a hash-driven test run). The Tools and Keyboard parts of Help were rewritten for Face / Mass; the old Push/Pull, Move and Add-block entries are gone.
+- The same eight steps are in `docs/TUTORIAL.md`, linked from the README.
+
 ## Phase 36 (2 Oct 2026): the report identifies the cores
 - New report sheet *Cores and exits*: a plan of the footprints with each core named, dimensioned and tied to the west property line and the street line, a section looking north with the cores as full-height bars labelled with their extent, and a table per core (size, position, exit stairs, elevators, extent, the masses it runs through, whether it reaches the roof; a core that stops short is marked red).
 - The project data sheet gains a *Cores and exit stairs* row with the same facts in words; the block schedule shows stairs and lifts for each core; the plan detail names the cores; the key axonometric marks each core on the roof instead of drawing it through the tower walls (the comparison axonometrics do the same).

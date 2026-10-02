@@ -252,6 +252,12 @@
   function renderHint() { placeChrome(); const h = HINT[state.tool][state.view]; $('toolHint').innerHTML = tipText ? esc(tipText) : typeof h === 'function' ? h() : h; const sg = $('pickSeg'); if (sg) { sg.hidden = !(state.view === '3d' && state.tool === 'select'); sg.querySelectorAll('[data-pick]').forEach((b) => b.classList.toggle('on', b.dataset.pick === state.pick)); } }
   /* the view and Face/Mass segments sit in one row with the toolbar buttons, right-aligned, unless a narrow layout has moved them to the left */
   function placeChrome() { const vtc = document.querySelector('.vtc'), vtr = document.querySelector('.vtr'); if (!vtc || !vtr) return; if (parseFloat(getComputedStyle(vtc).top) > 20) { vtc.style.right = ''; return; } /* a narrow layout has stacked it under the toolbar */ vtc.style.right = (vtr.offsetWidth + 20) + 'px'; }
+  /* the tutorial's Show me links: open the tab and section a step talks about */
+  function tutGo(k) { closePops(); const openSec = (sec) => { state.secOpen[sec] = true; setWorkspace('design'); renderDesign(); const d = document.querySelector(`details.sec[data-key="${sec}"]`); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } };
+    if (k === 'site') setWorkspace('site');
+    else if (['target', 'mix', 'typology', 'shape'].includes(k)) openSec(k);
+    else if (k === 'edit') { setWorkspace('design'); setView('3d'); setPick('face'); const t = project.blocks.filter((b) => b.use !== 'core' && b.use !== 'parking' && !b.hidden).sort((p, q) => Model.blockTop(q) - Model.blockTop(p))[0]; if (t) select(t.id); tip('Try it: drag a face of the tower to push it out, click a face to type a size, or switch to Mass and drag the block.'); }
+    else if (k === 'check') setWorkspace('check'); else if (k === 'compare') setWorkspace('compare'); else if (k === 'report') setWorkspace('report'); }
   function setPick(mode) { state.pick = mode === 'mass' ? 'mass' : 'face'; saveUi(); renderHint(); if (has3d) { Scene3D.cancelOp(); Scene3D.refresh(); } }
   function renderSnap() { const sn = state.snap, el = $('popSnap');
     el.innerHTML = `<h4>Snapping</h4><div class="snapgrid"><label style="flex-direction:row;align-items:center;gap:10px">Step <select id="optInc" style="width:auto">${[0.1, 0.25, 0.5, 1, 2].map((v) => `<option value="${v}" ${sn.inc === v ? 'selected' : ''}>${v} m</option>`).join('')}</select></label>
@@ -807,7 +813,9 @@
     $('btnSnap').onclick = () => togglePop('popSnap', $('btnSnap'));
     document.querySelectorAll('#pickSeg [data-pick]').forEach((b) => { b.onclick = () => setPick(b.dataset.pick); }); $('btnFit').onclick = () => { if (state.view === '3d' && has3d) Scene3D.fitProject(true); else { Views.refit(); Views.draw(); } };
     $('btnResetView').onclick = () => { if (state.view === '3d' && has3d) Scene3D.resetView(); else { Views.refit(); Views.draw(); } };
-    $('btnLayers').onclick = () => togglePop('popLayers', $('btnLayers')); $('btnHelp').onclick = () => togglePop('popHelp', $('btnHelp')); $('btnSave').onclick = () => togglePop('popSave', $('btnSave'));
+    $('btnLayers').onclick = () => togglePop('popLayers', $('btnLayers')); $('btnHelp').onclick = () => togglePop('popHelp', $('btnHelp')); document.querySelectorAll('#popHelp [data-tut]').forEach((b) => { b.onclick = () => tutGo(b.dataset.tut); });
+  /* a first visit opens the tutorial once (never during a hash-driven test run) */
+  try { if (!location.hash && !localStorage.getItem('dms.tutorial.seen')) { localStorage.setItem('dms.tutorial.seen', '1'); setTimeout(() => togglePop('popHelp', $('btnHelp')), 700); } } catch (e) { /* storage blocked */ }; $('btnSave').onclick = () => togglePop('popSave', $('btnSave'));
     $('saveGo').onclick = doSave; $('saveName').onkeydown = (e) => { if (e.key === 'Enter') doSave(); };
     document.addEventListener('pointerdown', (e) => { if (openPop && !openPop.el.contains(e.target) && !(openPop.btn && openPop.btn.contains(e.target))) closePops(); });
     $('btnUndo').onclick = undo; $('btnRedo').onclick = redo; $('btnAddRamp').onclick = addRamp;
