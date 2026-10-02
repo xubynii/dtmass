@@ -200,7 +200,7 @@
 
   /* ---------- viewport chrome ---------- */
   const HINT = {
-    select: { '3d': 'Drag a block to move it on its floor · on the selected block, pull a face along its arrow to resize it (click the face to type a size) · drag empty space to orbit', plan: 'Drag a block to move it · drag a handle of the selected block to resize it · drag empty space to pan', section: 'Drag a block to restack it · drag empty space to pan' },
+    select: { '3d': 'Drag a block to move it on its floor · on the selected block, drag a face to push or pull it and the roof to change the height (click a face to type a size); slide along a face to move the block · drag empty space to orbit', plan: 'Drag a block to move it · drag a handle of the selected block to resize it · drag empty space to pan', section: 'Drag a block to restack it · drag empty space to pan' },
     push: { '3d': '<b>Push/Pull</b> · Hover a face, then drag it. The opposite face stays fixed. Click a face to type an exact value.', plan: '<b>Push/Pull</b> · Drag an edge or corner handle of the selected block.', section: '<b>Push/Pull</b> works in 3D and Plan. Section shows heights.' },
     move: { '3d': '<b>Move</b> · Drag an arrow to slide along one axis, or the square to move freely. Size does not change.', plan: '<b>Move</b> · Drag a block across the site.', section: '<b>Move</b> · Drag a block up or down to restack it.' },
   };
