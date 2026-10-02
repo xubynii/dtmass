@@ -1,6 +1,6 @@
 # Downtown Massing Tool
 
-**Live tool:** https://xubynii.github.io/dtmass/ · Repository: https://github.com/xubynii/dtmass
+**Live tool:** https://xubynii.github.io/dtmass/
 
 ## 1. Purpose
 
