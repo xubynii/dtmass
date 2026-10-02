@@ -39,6 +39,9 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 39 (2 Oct 2026): repository clean-up
+- Removed modules nothing loads any more: `src/massing.js` and `src/typo.js` (replaced by gen.js and form.js in Phases 21–27), `src/iterate.js` and `src/ledger.js` (replaced by compare.js), and `tools/typo-test.js`. Removed `docs/CONTRACT.md`, the module contract from the first day, which described the old architecture. The raw OpenStreetMap download `docs/osm-raw.json` (5.6 MB) is no longer tracked: `src/osm-data.js` is the processed copy and `tools/fetch-osm.py` regenerates both. Local test output folders are ignored. Nothing the page loads or the tests use was removed; the regression and the plan test pass unchanged.
+
 ## Phase 38 (2 Oct 2026): interactive tour
 - Help → *Start the interactive tour* (also `#tour`, and automatic on a first visit): a card above the view takes the user through nine functions on the real model: confirm a restriction, set the target, set the mix, choose a typology, shape by hand, read a check, save a version, change and compare, make the report. Each step opens the right tab and section, highlights the control with a pulsing outline, watches the model and interface state until the action has been done, shows ✓ Done and moves on; *Do it for me* performs the same action through the same handlers the user would use, *Skip* and *Back* move freely, ✕ ends the tour. Regression step: every Do-it-for-me completes its step.
 

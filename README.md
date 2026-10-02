@@ -70,4 +70,4 @@ The Check tab for the same scheme, with a failing item open and its clause linke
 
 ## Repository layout
 
-`src/` the web page and its scripts · `tools/` local server, headless tests and screenshot scripts · `docs/` specification, architecture notes, slide text, demo script and screenshots · `CHANGELOG.md` the phase-by-phase development log.
+`src/` the web page and its scripts (every script is loaded by `src/index.html`; the two data files `city-data.js` and `osm-data.js` are generated, the latter by `tools/fetch-osm.py`) · `tools/` local server, headless tests and screenshot scripts · `docs/` the original specification, the architecture notes, the tutorial, slide text, demo script and screenshots · `CHANGELOG.md` the phase-by-phase development log.

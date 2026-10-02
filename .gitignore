@@ -2,6 +2,8 @@
 tools/review-*.html
 tools/review-edge/
 docs/codex-write-test.txt
+# raw OpenStreetMap download; regenerate with tools/fetch-osm.py (src/osm-data.js is the processed copy)
+docs/osm-raw.json
 *.log
 .DS_Store
 Thumbs.db
