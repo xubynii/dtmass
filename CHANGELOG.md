@@ -39,6 +39,10 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 31 (2 Oct 2026): no face arrows; the size popup stays put
+- The arrows drawn on a hovered or dragged face are gone; the tinted face and its outline are the whole affordance.
+- The push/pull and move popup is anchored once, beside the pointer where the operation began, and no longer follows the cursor. It stays there until the operation ends: a click anywhere else applies the drag, Enter applies a typed number, Esc cancels. It is only nudged back inside the view when it grows.
+
 ## Phase 30 (2 Oct 2026): street names in the plate style; pushing is the default on a selected face
 - Street names follow the reference plate the user sent: bold italic condensed capitals (Barlow Condensed, letter-spaced) in the accent red, lying flat along the street. The site's own streets get a 6 m name just outside the property line, centred on the block face; every other street in the surroundings is named once per block segment (names of the same street at least 80 m apart, nothing on the site itself), so every street in view carries its name.
 - Names are drawn twice: solid where nothing of the project stands in front, and as a faint ghost where one of the project's blocks hides them, so a name behind the tower is still legible without drawing over it. The depth clear before the label pass now forces the depth mask on (three.js ignores the clear after a depthWrite:false material), and below-grade blocks never hide a name.

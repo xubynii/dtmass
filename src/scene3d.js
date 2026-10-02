@@ -199,8 +199,7 @@ window.Scene3D = (function () {
     dispose(fxG); const pr = app.project(), acc = col('--accent');
     const showFace = (b, key, strong) => { const q = faceQuad(b, key); const g = new THREE.BufferGeometry().setFromPoints([q[0], q[1], q[2], q[0], q[2], q[3]]); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col('--accent'), transparent: true, opacity: strong ? 0.2 : 0.13, side: THREE.DoubleSide, depthTest: false, depthWrite: false })); m.renderOrder = 8; fxG.add(m);
       const ol = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(q), new THREE.LineBasicMaterial({ color: acc, depthTest: false })); ol.renderOrder = 9; fxG.add(ol);
-      const c = faceCentre(b, key), n = FACE[key].n, s = Math.max(1.2, sph.r * 0.018); const dir = T3(n[0], n[1], n[2]).normalize(); const arrow = new THREE.ArrowHelper(dir, T3(c[0] + n[0] * 0.2, c[1] + n[1] * 0.2, c[2] + n[2] * 0.2), s * 2.6, acc.getHex(), s * 1.1, s * 0.7); arrow.traverse((o) => { if (o.material) { o.material.depthTest = false; o.renderOrder = 10; } }); fxG.add(arrow);
-      if (key !== 'top') { const back = T3(n[0], n[1], n[2]).normalize().negate(); const a2 = new THREE.ArrowHelper(back, T3(c[0] - n[0] * 0.2, c[1] - n[1] * 0.2, c[2] - n[2] * 0.2), s * 1.2, acc.getHex(), s * 0.6, s * 0.45); a2.traverse((o) => { if (o.material) { o.material.depthTest = false; o.material.transparent = true; o.material.opacity = 0.5; o.renderOrder = 10; } }); fxG.add(a2); } };
+    };
     if (op && op.kind === 'push') { const b = pr.blocks.find((x) => x.id === op.id); if (b) showFace(b, op.face, true); }
     else if (hover && hover.face && (tool() === 'push' || (tool() === 'select' && app.selected() && hover.id === app.selected().id && !app.selected().locked))) { const b = pr.blocks.find((x) => x.id === hover.id); if (b) showFace(b, hover.face, false); }
     if (op) { const s0 = op.start, h0 = s0.use === 'core' ? s0.f2f : s0.floors * s0.f2f; const ghost = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s0.w, h0, s0.d)), new THREE.LineDashedMaterial({ color: col('--muted'), dashSize: 0.8, gapSize: 0.5, depthTest: false, transparent: true, opacity: 0.8 })); ghost.position.set(s0.x + s0.w / 2, s0.z0 + h0 / 2, -(s0.y + s0.d / 2)); ghost.computeLineDistances(); ghost.renderOrder = 7; fxG.add(ghost);
@@ -216,13 +215,13 @@ window.Scene3D = (function () {
     layer.innerHTML = html.join('');
   }
   const escH = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function placeReadout() { const el = dom.readout; if (!el) return; if (!op) { el.hidden = true; return; } el.hidden = false; const host = canvas.getBoundingClientRect(); const w = el.offsetWidth || 260, h = el.offsetHeight || 120, px = lastPtr.x - host.left, py = lastPtr.y - host.top, G = 24;
+  function placeReadout() { const el = dom.readout; if (!el) return; if (!op) { el.hidden = true; return; } el.hidden = false; const host = canvas.getBoundingClientRect(); /* anchored once where the operation began; only the clamp to the view is redone as the popup grows */ if (op.pos) { const w0 = el.offsetWidth || 260, h0 = el.offsetHeight || 120; el.style.left = Math.min(Math.max(8, op.pos[0]), host.width - w0 - 8) + 'px'; el.style.top = Math.min(Math.max(8, op.pos[1]), host.height - h0 - 8) + 'px'; return; } const w = el.offsetWidth || 260, h = el.offsetHeight || 120, px = lastPtr.x - host.left, py = lastPtr.y - host.top, G = 24;
     /* try the four corners around the cursor and keep the one that covers the fewest labels and stays inside the view */
     const labels = dom.annot ? [...dom.annot.children].filter((a) => !a.hidden).map((a) => { const r = a.getBoundingClientRect(); return { x: r.left - host.left, y: r.top - host.top, w: r.width, h: r.height }; }) : [];
     const cands = [[px + G, py + G], [px - w - G, py + G], [px + G, py - h - G], [px - w - G, py - h - G]];
     let best = null, bestScore = Infinity;
     for (const [cx, cy] of cands) { const x = Math.min(Math.max(8, cx), host.width - w - 8), y = Math.min(Math.max(8, cy), host.height - h - 8); let sc = Math.abs(x - cx) + Math.abs(y - cy); for (const a of labels) { const ox = Math.max(0, Math.min(x + w, a.x + a.w) - Math.max(x, a.x)), oy = Math.max(0, Math.min(y + h, a.y + a.h) - Math.max(y, a.y)); sc += ox * oy; } if (px >= x - 4 && px <= x + w + 4 && py >= y - 4 && py <= y + h + 4) sc += 1e6; if (sc < bestScore) { bestScore = sc; best = [x, y]; } }
-    el.style.left = best[0] + 'px'; el.style.top = best[1] + 'px'; }
+    op.pos = best; el.style.left = best[0] + 'px'; el.style.top = best[1] + 'px'; }
   function renderReadout() {
     const el = dom.readout; if (!el || !op) return; const info = op.info || {}, E = op.entry, unit = info.unit || 'm';
     const offTxt = info.unit === 'storeys' ? `${info.offset >= 0 ? '+' : '−'}${Math.abs(info.offset)} storey${Math.abs(info.offset) === 1 ? '' : 's'}` : fmtM(info.offset || 0);
