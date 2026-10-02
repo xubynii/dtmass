@@ -39,6 +39,10 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 28 (2 Oct 2026): direct dragging, floors fixed, best typical layout per program
+- No move arrows: dragging the body of any block moves it on its own floor (base elevation never changes by dragging, in 3D or in Section); the selected block shows small face handles (four sides and roof) that push or pull that face. Floor level changes only through the side panel: Base elevation, or the new "Starts at" selector (ground, or the top of a named block).
+- Plan engine (`plans.js`): for corridor uses (residential, hotel, office) four corridor layouts are generated per level (adaptive ring with spurs, full ring with spurs, adaptive ring, full ring) and scored by leasable share with penalties for travel over the limit, unreachable rooms, dead ends over 6 m, deep or oversize units and corridor area; the best is kept and the plan notes which layout won and why. Retail, restaurant and parking keep their single typical layout.
+
 ## Phase 27 (2 Oct 2026): typology and form divided cleanly
 - Massing typology is only how the program sits on the site: Slender Tower, Podium + Tower, Split Towers on a Shared Podium, Courtyard Podium + Tower (Stepped and Terraced presets removed, their sculpting lives in Shape the building).
 - Shape the building is only sculpting: Tower form tiles (Plain box, Tapered shaft, Twisting tower, Set-back tiers, Shifted stack, Uploaded massing; the Extruded prism tile is gone), the chosen form's parameters, Terraces (the stepping rules), Voids, plan rotation, folded Storey edits and Precedent rules, Shuffle / Reset. The Envelope sliders are removed because sizes belong to the typology and the block panel. Terraces and voids now work on a plain box too (a prism form is created behind the scenes), and choosing Plain box keeps them.

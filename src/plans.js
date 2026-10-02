@@ -27,7 +27,7 @@ window.Plans = (function () {
       const sides = { N: G.R(c.x - cw, c.y + c.d, c.w + 2 * cw, cw), S: G.R(c.x - cw, c.y - cw, c.w + 2 * cw, cw), E: G.R(c.x + c.w, c.y - cw, cw, c.d + 2 * cw), W: G.R(c.x - cw, c.y - cw, cw, c.d + 2 * cw) };
       const gap = { N: bb.y + bb.d - (c.y + c.d + cw), S: c.y - cw - bb.y, E: bb.x + bb.w - (c.x + c.w + cw), W: c.x - cw - bb.x };
       const keep = {};
-      for (const k of 'NSEW') keep[k] = inPlate(sides[k]) && gap[k] >= 4.5;
+      for (const k of 'NSEW') keep[k] = inPlate(sides[k]) && gap[k] >= (opts.full ? 2.5 : 4.5);
       // connectivity: if two opposite sides are dropped the ring is two pieces; keep the one with the larger gap if it fits
       for (const [a, b] of [['N', 'S'], ['E', 'W']]) if (!keep[a] && !keep[b]) { const k = gap[a] >= gap[b] ? a : b; if (inPlate(sides[k])) keep[k] = true; }
       const out = []; for (const k of 'NSEW') if (keep[k]) out.push(Object.assign(sides[k], { tag: 'ring', side: k, core: c }));
@@ -115,10 +115,32 @@ window.Plans = (function () {
   }
 
   /* ---------- the pipeline ---------- */
+  /* Candidate corridor layouts for a level; the one with the largest leasable share that still clears travel, reach and
+     dead-end limits wins, so each program gets its typical layout: a double-loaded ring with spurs for homes and hotel rooms,
+     the tightest ring for offices, no corridor for retail, restaurants and parking. */
+  const LAYOUT_NAME = ['ring corridor with spurs', 'full ring with spurs', 'ring corridor', 'full ring'];
+  function layoutScore(res) {
+    const m = res.metrics, area = Math.max(1, m.area || 1), roomsA = res.rooms.filter((r) => !r.parent && r.kind !== 'open' && r.kind !== 'aisle' && r.kind !== 'stall' && r.kind !== 'ramp' && r.kind !== 'unit' && !['residential', 'hotel', 'office'].includes(r.use)).reduce((a, r) => a + (r.area || G.area(r.rect)), 0), lease = (m.unitArea || 0) + (m.openArea || 0) + roomsA, corr = res.corridors.reduce((a, s) => a + G.area(s), 0), eff = lease / area, why = []; let pen = 0;
+    const lim = (CODES.travel && CODES.travel.sprinkleredAny) || 45;
+    if (m.maxTravel > lim) { pen += 1; why.push(`travel ${m.maxTravel.toFixed(0)} m over ${lim} m`); }
+    if (m.unreachedRooms) { pen += m.unreachedRooms; why.push(`${m.unreachedRooms} room${m.unreachedRooms === 1 ? '' : 's'} unreachable`); }
+    if (m.deadEnd > 6) { pen += 0.3; why.push(`dead end ${m.deadEnd.toFixed(1)} m`); }
+    const bad = res.flags.filter((f) => /deeper than 13.5|corner suite/.test(f)).length; pen += 0.1 * bad; pen += corr / area * 0.5;
+    return { eff, total: eff - pen, why: why.join(', ') };
+  }
   function forLevel(project, L) {
     const sig = signature(project, L);
     if (cache.has(sig)) return cache.get(sig);
     if (cache.size > 300) cache.clear();
+    const t0 = performance.now();
+    const corrUse = L.blocks.some((b) => CW[b.use] > 0) && L.cores.length > 0, variants = corrUse ? [0, 1, 2, 3] : [0];
+    let best = null; const scored = [];
+    for (const vnt of variants) { let r; try { r = buildLevel(project, L, vnt); } catch (e) { console.error('layout variant', vnt, e); continue; } const sc = layoutScore(r); scored.push({ vnt, sc, r }); if (!best || sc.total > best.sc.total + 1e-9) best = { vnt, sc, r }; }
+    const res = best.r; if (corrUse) { res.metrics.layout = LAYOUT_NAME[best.vnt]; res.metrics.layoutEff = best.sc.eff; }
+    if (scored.length > 1 && best.sc.eff > 0 && scored.some((q) => q.vnt !== best.vnt && q.sc.total < best.sc.total - 0.01)) { const alt = scored.filter((q) => q.vnt !== best.vnt).sort((a, b) => b.sc.total - a.sc.total)[0]; res.flags.unshift(`Layout: ${LAYOUT_NAME[best.vnt]} (${Math.round(best.sc.eff * 100)}% leasable${best.sc.why ? ', ' + best.sc.why : ''}) chosen over ${LAYOUT_NAME[alt.vnt]} (${Math.round(alt.sc.eff * 100)}%${alt.sc.why ? ', ' + alt.sc.why : ''}).`); }
+    res.time = performance.now() - t0; cache.set(sig, res); return res;
+  }
+  function buildLevel(project, L, variant) {
     const t0 = performance.now();
     roomSeq = 0;
     const tiles = L.blocks.map((b) => ({ rect: Model.rect(b), use: b.use, blockId: b.id, name: b.name }));
@@ -137,7 +159,7 @@ window.Plans = (function () {
       const rects = tiles.filter((t) => t.use === u).map((t) => t.rect);
       const coresHere = cores.filter((c) => rects.some((r) => G.overlaps(c, r)));
       if (!coresHere.length) { res.flags.push(`${Model.USE_LABEL[u]} floor has no core: no corridor or exits generated.`); continue; }
-      const segs = corridors(rects, coresHere, CW[u], { spurs: u === 'residential' || u === 'hotel', unitDepth: 10 });
+      const segs = corridors(rects, coresHere, CW[u], { spurs: (u === 'residential' || u === 'hotel') && variant < 2, unitDepth: 10, full: variant === 1 || variant === 3 });
       for (const s of segs) { s.use = u; grid.fill(s, C.CORR); }
       res.corridors.push(...segs);
     }
@@ -198,7 +220,6 @@ window.Plans = (function () {
     res.metrics.area = Model.unionArea(plateRects) - Model.unionArea(cores.flatMap((c) => plateRects.map((p) => G.inter(c, p)).filter(Boolean)));
     res.walls = G.wallsFor(res.rooms.filter((r) => r.kind !== 'stall' && r.kind !== 'aisle' && r.kind !== 'open'));
     res.time = performance.now() - t0;
-    cache.set(sig, res);
     return res;
   }
   function mergeMetrics(m, o) { for (const [k, v] of Object.entries(o)) { if (k === 'flags') continue; if (typeof v === 'number') m[k] = (m[k] || 0) + v; else if (k === 'units' && v) { for (const t of Object.keys(v)) m.units[t] = (m.units[t] || 0) + v[t]; } else if (m[k] === undefined) m[k] = v; } }

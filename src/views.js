@@ -281,7 +281,7 @@ window.Views = (function () {
         if (x1 - x0 < 2) { if (fx === 0) x0 = x1 - 2; else x1 = x0 + 2; } if (y1 - y0 < 2) { if (fy === 1) y0 = y1 - 2; else y1 = y0 + 2; }
         if (o.len != null) { patch.x = x0; patch.y = y0; if (o.dir === 'N' || o.dir === 'S') { patch.w = x1 - x0; patch.len = y1 - y0; } else { patch.len = x1 - x0; patch.w = y1 - y0; } }
         else { patch.x = x0; patch.y = y0; patch.w = x1 - x0; patch.d = y1 - y0; } } }
-    else if (app.state.view === 'section') { const { axis } = secSetup(); const du = dsx / cam.sec.s, dz = -dsy / cam.sec.s; if (axis === 'x') patch.x = snap(o.x + du); else patch.y = snap(o.y + du); patch.z0 = app.snapZ(o.z0 + dz, drag.obj); }
+    else if (app.state.view === 'section') { const { axis } = secSetup(); const du = dsx / cam.sec.s; if (axis === 'x') patch.x = snap(o.x + du); else patch.y = snap(o.y + du); /* the floor level changes only through the side panel */ }
     else { const [dx, dy] = groundDelta(dsx, dsy); patch.x = snap(o.x + dx); patch.y = snap(o.y + dy); }
     // keep inside the site
     const s = site(); const r = Object.assign({}, selRect(Object.assign({}, o, patch)));
