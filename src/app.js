@@ -10,7 +10,7 @@
   const DEFAULT_SNAP = { inc: 0.25, storeys: true, align: true, constrain: false };
   const UI_KEY = 'dms.ui.v4';
   const stored = (() => { try { const v = JSON.parse(localStorage.getItem(UI_KEY)); if (v) return v; const old = JSON.parse(localStorage.getItem('dms.ui.v3')) || {}; delete old.aids; return old; } catch (e) { return {}; } })();
-  const state = { workspace: stored.workspace || 'design', view: '3d', tool: 'select', levelKey: null, heat: false, selected: null, issue: null, checkFilter: { status: 'all', group: 'all', block: null }, secAxis: 'x', secPos: 0, highlight: [], focusIds: [],
+  const state = { workspace: stored.workspace || 'design', view: '3d', tool: 'select', pickPair: false, levelKey: null, heat: false, selected: null, issue: null, checkFilter: { status: 'all', group: 'all', block: null }, secAxis: 'x', secPos: 0, highlight: [], focusIds: [],
     aids: Object.assign({}, DEFAULT_AIDS, stored.aids || {}), snap: Object.assign({}, DEFAULT_SNAP, stored.snap || {}), lw: stored.lw || null, rw: stored.rw || null, lcollapsed: !!stored.lcollapsed, highlightPark: null, progView: stored.progView || 'occ', editMode: stored.editMode || 'free', secOpen: stored.secOpen || {} };
   const saveUi = () => { try { localStorage.setItem(UI_KEY, JSON.stringify({ workspace: state.workspace, aids: state.aids, snap: state.snap, lw: state.lw, rw: state.rw, lcollapsed: state.lcollapsed, progView: state.progView, editMode: state.editMode, secOpen: state.secOpen })); } catch (e) { /* no storage */ } };
   function exampleProject() { try { if (window.Site && Site.available()) { const hit = Site.search('1189 HOWE')[0]; if (hit) { const ns = Site.siteFromParcel(hit.i); delete ns.frame; const p = Model.demoProject(ns); p.name = 'Howe & Davie tower study'; return p; } } } catch (e) { console.warn('example site', e); } const p = Model.demoProject(); p.name = 'Tower study'; return p; }
@@ -32,7 +32,8 @@
   function context() { const s = project.site; const key = s.parcelIndex != null ? `${s.parcelIndex}:${s.w}:${s.d}` : null; if (key !== ctxKey) { ctxKey = key; ctxData = key != null && window.Site && Site.available() ? Site.context(s) : null; if (has3d) Scene3D.invalidateStatic(); } return ctxData; }
   /* evaluate a candidate project without touching the live one (used by the randomized start) */
   function evaluateProject(p) { try { const mp = window.Form ? Form.expand(p) : p, lv = Model.levels(mp); mp._parkNeed = Rules.parkingNeed(mp); const pl = {}; for (const L of lv) pl[L.key] = Plans.forLevel(mp, L); const rws = Rules.evaluate(mp, pl, lv, context()); return { rows: rws, fails: rws.filter((r) => r.verdict === 'fail').length }; } catch (e) { console.warn('evaluateProject', e); return { rows: [], fails: 99 }; } }
-  function selectPair(id) { const sel = selected(); if (!sel || !id || id === sel.id) return; state.pair = id; renderRight(); drawStage(false); }
+  function selectPair(id) { const sel = selected(); if (!sel || !id || id === sel.id) return; state.pair = id; state.pickPair = false; tip(null); renderRight(); drawStage(false); }
+  function pickPair(on) { state.pickPair = !!on; tip(state.pickPair ? 'Click the second block in the model to see the fire separation the two need · Esc cancels' : null); renderRight(); drawStage(false); }
   function computeAll() {
     if (window.Brief) Brief.ensure(project);
     if (project.site.setbackSet == null) project.site.setbackSet = project.site.dd || project.site.parcelIndex != null ? 'ds' : 'none';
@@ -104,13 +105,36 @@
   /* guideline setbacks are hard limits in the model: a block's footprint is kept inside the box its height allows */
   function clampSetbacks(b, patch) { if (!b || b.len != null || b.use === 'core' || b.use === 'parking' || !Rules.setbackBox) return patch; const m = Object.assign({}, b, patch), top = m.z0 + m.floors * m.f2f; if (top <= 0.1) return patch; const box = Rules.setbackBox(project.site, top), aw = box.x1 - box.x0, ad = box.y1 - box.y0; if (aw < 3 || ad < 3) return patch;
     const w = Math.min(m.w, aw), d = Math.min(m.d, ad), x = Math.min(Math.max(m.x, box.x0), box.x1 - w), y = Math.min(Math.max(m.y, box.y0), box.y1 - d), out = Object.assign({}, patch); if (Math.abs(w - m.w) > 1e-9) out.w = Model.snap(w); if (Math.abs(d - m.d) > 1e-9) out.d = Model.snap(d); if (Math.abs(x - m.x) > 1e-9) out.x = Model.snap(x); if (Math.abs(y - m.y) > 1e-9) out.y = Model.snap(y); return out; }
+  /* no two blocks may occupy the same space (cores sit inside their tower and are exempt). The face or side that moved is held
+     at the neighbour it ran into; if that cannot resolve the overlap the change is refused and the block keeps its previous geometry. */
+  const volOverlap = (m, o) => { const hm = m.use === 'core' ? m.f2f : m.floors * m.f2f, ho = o.use === 'core' ? o.f2f : o.floors * o.f2f, t = 0.01;
+    return m.x < o.x + o.w - t && o.x < m.x + m.w - t && m.y < o.y + o.d - t && o.y < m.y + m.d - t && m.z0 < o.z0 + ho - t && o.z0 < m.z0 + hm - t; };
+  function overlapOthers(b, skipId) { return project.blocks.filter((o) => o.id !== b.id && o.id !== skipId && o.len == null && o.use !== 'core'); }
+  function clampOverlap(b, patch, others) {
+    if (!b || b.len != null || b.use === 'core') return patch; const keys = Object.keys(patch); if (!keys.some((k) => ['x', 'y', 'w', 'd', 'z0', 'floors', 'f2f'].includes(k))) return patch;
+    const m = Object.assign({}, b, patch), list = others || overlapOthers(b), hOf = (q) => q.floors * q.f2f, EPS = 1e-6;
+    const moveX = 'x' in patch && !('w' in patch), moveY = 'y' in patch && !('d' in patch), moveZ = 'z0' in patch && !('floors' in patch) && !('f2f' in patch);
+    for (let it = 0; it < 8; it++) {
+      const o = list.find((q) => volOverlap(m, q)); if (!o) break; const oT = o.floors * o.f2f + o.z0;
+      const pen = { x: Math.min(m.x + m.w - o.x, o.x + o.w - m.x), y: Math.min(m.y + m.d - o.y, o.y + o.d - m.y), z: Math.min(m.z0 + hOf(m) - o.z0, oT - m.z0) };
+      const cand = []; if ('x' in patch || 'w' in patch) cand.push('x'); if ('y' in patch || 'd' in patch) cand.push('y'); if ('z0' in patch || 'floors' in patch || 'f2f' in patch) cand.push('z');
+      cand.sort((p, q) => pen[p] - pen[q]); let done = false;
+      for (const ax of cand) {
+        if (ax === 'x') { const eastOut = m.x + m.w > b.x + b.w + EPS, westOut = m.x < b.x - EPS; if (eastOut && o.x >= b.x + b.w - 0.05) { if (moveX) m.x = o.x - m.w; else m.w = o.x - m.x; done = true; } else if (westOut && o.x + o.w <= b.x + 0.05) { if (moveX) m.x = o.x + o.w; else { const x1 = m.x + m.w; m.x = o.x + o.w; m.w = x1 - m.x; } done = true; } }
+        else if (ax === 'y') { const nOut = m.y + m.d > b.y + b.d + EPS, sOut = m.y < b.y - EPS; if (nOut && o.y >= b.y + b.d - 0.05) { if (moveY) m.y = o.y - m.d; else m.d = o.y - m.y; done = true; } else if (sOut && o.y + o.d <= b.y + 0.05) { if (moveY) m.y = o.y + o.d; else { const y1 = m.y + m.d; m.y = o.y + o.d; m.d = y1 - m.y; } done = true; } }
+        else { const topOut = m.z0 + hOf(m) > b.z0 + hOf(b) + EPS, botOut = m.z0 < b.z0 - EPS; if (topOut && o.z0 >= b.z0 + hOf(b) - 0.05) { if (moveZ) m.z0 = o.z0 - hOf(m); else m.floors = Math.max(1, Math.floor((o.z0 - m.z0) / m.f2f + EPS)); done = true; } else if (botOut && oT <= b.z0 + 0.05) { m.z0 = oT; done = true; } }
+        if (done) break; }
+      if (!done || m.w < 1 || m.d < 1) { return Object.fromEntries(keys.map((k) => [k, b[k]])); }
+    }
+    if (list.some((q) => volOverlap(m, q))) return Object.fromEntries(keys.map((k) => [k, b[k]]));
+    const out = {}; for (const k of ['x', 'y', 'w', 'd', 'z0', 'floors', 'f2f']) if (Math.abs(m[k] - b[k]) > EPS || k in patch) out[k] = ['x', 'y', 'w', 'd'].includes(k) ? Model.snap(m[k]) : m[k]; for (const k of keys) if (!(k in out)) out[k] = patch[k]; return out; }
   function edit(id, patch, isCommit) {
-    const obj = project.blocks.find((b) => b.id === id) || project.ramps.find((r) => r.id === id); if (!obj) return; if (!isCommit) patch = clampSetbacks(obj, patch);
+    const obj = project.blocks.find((b) => b.id === id) || project.ramps.find((r) => r.id === id); if (!obj) return; if (!isCommit) patch = clampOverlap(obj, clampSetbacks(obj, patch));
     if (obj.locked && !isCommit && Object.keys(patch).some((k) => ['x', 'y', 'w', 'd', 'z0', 'len', 'floors', 'f2f'].includes(k))) { toast(`${obj.name || 'Ramp'} is locked`); return; }
     if (isCommit) { if (JSON.stringify(baseline) !== JSON.stringify(project)) { history.past.push(baseline); if (history.past.length > history.max) history.past.shift(); history.future = []; } baseline = Model.clone(project); afterModelChange(true); return; }
     applyWithCores(obj, patch); markEdited(); afterModelChange(false);
   }
-  function setField(obj, key, value, isNumber = true) { commit(); if (['x', 'y', 'w', 'd', 'z0', 'floors', 'f2f'].includes(key) && obj.use) applyWithCores(obj, clampSetbacks(obj, { [key]: isNumber ? Number(value) : value })); else obj[key] = isNumber ? Number(value) : value; if (obj.use) markEdited(); baseline = Model.clone(project); afterModelChange(true); }
+  function setField(obj, key, value, isNumber = true) { commit(); if (['x', 'y', 'w', 'd', 'z0', 'floors', 'f2f'].includes(key) && obj.use) applyWithCores(obj, clampOverlap(obj, clampSetbacks(obj, { [key]: isNumber ? Number(value) : value }))); else obj[key] = isNumber ? Number(value) : value; if (obj.use) markEdited(); baseline = Model.clone(project); afterModelChange(true); }
   function mutate(fn, msg) { commit(); const b0 = JSON.stringify(project.blocks); fn(); if (JSON.stringify(project.blocks) !== b0) markEdited(); baseline = Model.clone(project); afterModelChange(true); if (msg) toast(msg); }
   /* parametric massing (massing.js): regenerate the blocks from the saved parameters; blocks keep their id, form, lock and visibility by name */
   function applyMassing(result, isCommit, param) {
@@ -417,7 +441,7 @@
     const b = project.blocks.find((x) => x.id === id); if (!b) return; const s = project.site;
     const msg = { dup: 'Duplicated', stack: 'Stacked a copy on top', splitLR: 'Split side to side', splitFB: 'Split front to back', splitUD: b.floors >= 2 ? 'Split by storeys' : 'One storey cannot be split', lock: b.locked ? 'Unlocked' : 'Locked', hide: b.hidden ? 'Shown' : 'Hidden' }[act];
     mutate(() => {
-      if (act === 'dup') { const c = Model.block(Object.assign({}, b, { id: undefined, name: b.name + ' copy', x: Math.min(b.x + b.w + 1, Math.max(0, s.w - b.w)) })); project.blocks.push(c); state.selected = c.id; }
+      if (act === 'dup') { const c = Model.block(Object.assign({}, b, { id: undefined, name: b.name + ' copy' })); const tx = Math.min(b.x + b.w + 1, Math.max(0, s.w - b.w)); const cl = clampOverlap(c, { x: tx }, overlapOthers(c)); Object.assign(c, cl); if (overlapOthers(c).some((o) => volOverlap(c, o))) { c.x = b.x; c.z0 = Model.blockTop(b); } project.blocks.push(c); state.selected = c.id; }
       else if (act === 'stack') { const c = Model.block(Object.assign({}, b, { id: undefined, name: b.name + ' upper', z0: Model.blockTop(b) })); project.blocks.push(c); state.selected = c.id; }
       else if (act === 'splitLR') { const w1 = Model.snap(b.w / 2); const c = Model.block(Object.assign({}, b, { id: undefined, name: b.name + ' east', x: b.x + w1, w: b.w - w1 })); b.w = w1; b.name += ' west'; project.blocks.push(c); }
       else if (act === 'splitFB') { const d1 = Model.snap(b.d / 2); const c = Model.block(Object.assign({}, b, { id: undefined, name: b.name + ' rear', y: b.y + d1, d: b.d - d1 })); b.d = d1; b.name += ' front'; project.blocks.push(c); }
@@ -616,13 +640,13 @@
       <fieldset class="fs"><legend>Position and rotation</legend><div class="row2">${uf('From west line', 'x', b, 'm')}${uf('From street line', 'y', b, 'm')}</div><button id="pRot">Rotate 90°</button></fieldset>
       ${b.use !== 'core' && b.use !== 'parking' && window.Form ? `<fieldset class="fs"><legend>Form</legend><div class="chkline"><span>${esc(Form.active(b) ? Form.describe(b) : 'plain box')}</span><button class="link" id="pForm">Shape in the Form tab</button></div></fieldset>` : ''}
       <div class="btnrow" style="margin-bottom:16px"><button data-act="dup">Duplicate</button><button data-act="stack">Stack copy</button><div class="popwrap"><button id="pMore" aria-haspopup="true" aria-expanded="false">More actions ▾</button><div class="pop menulist" id="popMore" hidden style="width:210px;left:0;right:auto">${isCore ? '' : '<button data-act="splitLR">Split side to side</button><button data-act="splitFB">Split front to back</button><button data-act="splitUD">Split by storeys</button>'}<button data-act="lock">${b.locked ? 'Unlock' : 'Lock'}</button><button data-act="hide">${b.hidden ? 'Show' : 'Hide'}</button></div></div></div>
-      <fieldset class="fs"><legend>Fire separation to another block</legend><label>Compare with<select id="pairSel"><option value="">Choose a block, or shift-click one in the model</option>${project.blocks.filter((o) => o.id !== b.id && o.len == null).map((o) => `<option value="${o.id}" ${state.pair === o.id ? 'selected' : ''}>${esc(o.name)} · ${Model.USE_LABEL[o.use]}</option>`).join('')}</select></label><div id="pairOut">${pairHTML(b)}</div></fieldset>
+      <fieldset class="fs"><legend>Fire separation to another block</legend><div class="chkline" style="margin-bottom:6px"><span class="hint" style="margin:0">Rating the separation between the selected block and a second one needs (Table 3.1.3.1).</span><button id="pairPick" class="${state.pickPair ? 'on' : ''}">${state.pickPair ? 'Click a block in the model…' : 'Pick in model'}</button></div><label>Or choose it here<select id="pairSel"><option value="">Choose a block</option>${project.blocks.filter((o) => o.id !== b.id && o.len == null).map((o) => `<option value="${o.id}" ${state.pair === o.id ? 'selected' : ''}>${esc(o.name)} · ${Model.USE_LABEL[o.use]}</option>`).join('')}</select></label><div id="pairOut">${pairHTML(b)}</div></fieldset>
       <fieldset class="fs"><legend>Checks on this block</legend><div class="chkline"><span class="st-fail">✕ ${n.fail}</span><span class="st-review">! ${n.review}</span><span style="color:var(--pass)">✓ ${n.pass}</span><button class="link" id="pChecks">View block checks</button></div></fieldset>
       <div style="border-top:1px solid var(--line2);padding-top:12px"><button class="danger" id="pDel">Delete block</button> <span class="hint" style="margin-left:6px">Undo restores it.</span></div>`;
     const psits = $('pSits'); if (psits) psits.onchange = () => { const v2 = psits.value; if (!v2) return; const z = v2 === 'ground' ? 0 : Model.blockTop(project.blocks.find((o) => o.id === v2)); placeAt(b.id, z); };
     wireProps(b); syncProps(); const pf = $('pForm'); if (pf) pf.onclick = () => { if (state.workspace !== 'design') setWorkspace('design'); else renderFormTab(); };
     $('pChecks').onclick = () => { state.checkFilter = { status: 'all', group: 'all', block: b.id }; setWorkspace('check'); };
-    const ps = $('pairSel'); if (ps) ps.onchange = () => { state.pair = ps.value || null; $('pairOut').innerHTML = pairHTML(b); drawStage(false); };
+    const ps = $('pairSel'); if (ps) ps.onchange = () => { state.pair = ps.value || null; $('pairOut').innerHTML = pairHTML(b); drawStage(false); }; const pp = $('pairPick'); if (pp) pp.onclick = () => pickPair(!state.pickPair);
     $('pMore').onclick = () => togglePop('popMore', $('pMore'));
   }
   function wireHead(b) {
@@ -646,7 +670,7 @@
   }
   function select(id) {
     if (has3d && Scene3D.busy()) return; if (id && String(id).includes('~')) id = String(id).split('~')[0];
-    state.selected = id; state.pair = null; if (id && state.workspace !== 'check') state.issue = null; if (id && state.workspace === 'check') state.issue = null; tipText = null;
+    state.selected = id; state.pair = null; state.pickPair = false; if (id && state.workspace !== 'check') state.issue = null; if (id && state.workspace === 'check') state.issue = null; tipText = null;
     const sel = selected(); if (sel && state.view === 'section' && sel.len == null) state.secPos = state.secAxis === 'x' ? sel.y + sel.d / 2 : sel.x + sel.w / 2;
     document.querySelectorAll('.brow, .lrow').forEach((el) => { const on = el.dataset.id === id; el.classList.toggle('on', on); el.setAttribute('aria-pressed', String(on)); });
     if (id && state.workspace === 'design') { const el = document.querySelector(`.lrow[data-id="${id}"], .brow[data-id="${id}"]`); if (el) el.scrollIntoView({ block: 'nearest' }); }
@@ -690,6 +714,7 @@
     if (inInput || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k === 'o') { rotateSelected(); return; }
+    if (e.key === 'Escape' && state.pickPair) { pickPair(false); return; }
     const sel = selected(); if (!sel) return;
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
     if (k === 'l' && sel.use) { blockAction('lock', sel.id); return; } if (k === 'h' && sel.use) { blockAction('hide', sel.id); return; }
@@ -733,6 +758,9 @@
     { setWorkspace('design'); state.formAll = true; select(null); await wait(40); const chip = document.querySelector('[data-fsel="*"]'); if (chip) chip.click(); await wait(40); const tb = document.querySelector('#formBox [data-ftype="taper"]'); if (tb) tb.click(); await wait(80); const g = project.blocks.filter((b) => b.use !== 'core' && b.use !== 'parking' && b.z0 > -0.01 && !b.hidden); ok('Whole building: a taper spans every above-grade block', g.length > 1 && g.every((b) => b.form && b.form.type === 'taper' && b.form.span && b.form.span.H > 0), `${g.length} blocks, span ${g[0] && g[0].form && g[0].form.span ? g[0].form.span.H.toFixed(1) : '—'} m`); undo(); await wait(40); state.formAll = false; }
     { const r = rows.find((x) => x.id === 'setback'); ok('Guideline setbacks row in the checks', !!r && r.verdict !== 'info', r ? `${r.verdict}: ${String(r.value).slice(0, 90)}` : 'no row'); }
     { const t = T(), other = project.blocks.find((b) => b.use === 'retail') || project.blocks.find((b) => b !== t && b.use !== 'core'); select(t.id); selectPair(other.id); await wait(30); const txt = ($('pairOut') || {}).textContent || ''; const fs = Rules.fireSeparation(t, other); ok('Fire separation between two blocks', !!$('pairOut') && txt.length > 20, `${t.name} (${fs.ga}) / ${other.name} (${fs.gb}): ${fs.hours} h, ${fs.rel}`); select(null); }
+    { const t = T(), pod = project.blocks.find((b) => b.use === 'office') || project.blocks.find((b) => b !== t && b.use !== 'core' && b.z0 >= 0); select(t.id); await wait(30); pickPair(true); await wait(30); const p = Scene3D.screenOf(pod.x + pod.w / 2, pod.y, pod.z0 + pod.floors * pod.f2f / 2); ev('pointermove', p, { buttons: 0 }); await wait(20); ev('pointerdown', p); ev('pointerup', p); await wait(60); ok('Fire separation: pick the second block in the model', state.pair === pod.id && !state.pickPair && T().w === t.w && T().x === t.x, `pair = ${state.pair ? project.blocks.find((b) => b.id === state.pair).name : 'none'} · tower unchanged`); select(null); }
+    { const t = T(), z1 = t.z0, below = project.blocks.filter((b) => b.use !== 'core' && b.id !== t.id && Math.abs(Model.blockTop(b) - t.z0) < 0.05 && Model.rectsOverlap(b, t)); edit(t.id, { z0: t.z0 - 3 }, false); const zAfter = T().z0; edit(t.id, {}, true); ok('No overlap: lowering the tower into the podium is held at the podium roof', below.length > 0 && Math.abs(zAfter - z1) < 1e-6, `z0 ${z1} → ${zAfter}`); }
+    { const r1 = project.blocks.find((b) => b.use === 'retail'), r2 = project.blocks.find((b) => b.use === 'restaurant' && Math.abs(b.z0 - r1.z0) < 0.05); if (r1 && r2) { const x0 = r2.x, w1 = r1.w; edit(r1.id, { w: r1.w + 10 }, false); const wAfter = r1.w; edit(r1.id, {}, true); ok('No overlap: pulling a face into a neighbour stops at its wall', Math.abs(r1.x + wAfter - x0) < 0.01 || wAfter === w1, `width ${w1} → ${wAfter}, neighbour at x ${x0}`); edit(r1.id, { w: w1 }, false); edit(r1.id, {}, true); } else ok('No overlap: pulling a face into a neighbour stops at its wall', true, 'no adjacent pair in this project'); }
     { setWorkspace('site'); setBrief((B) => { B.gfa = 24000; B.mix = { residential: 55, hotel: 10, office: 15, retail: 8, restaurant: 4, amenity: 8 }; B.plate = 620; B.parkingLevels = 2; B.heightTarget = null; }); const A = Brief.areas(project); ok('Brief: program mix defined and adds to 100%', A.ok && A.gfaTarget === 24000, `${A.total}% · ${A.gfaTarget} m² · ${Object.entries(A.by).filter(([, r]) => r.pct).map(([u, r]) => `${u} ${fmt0(r.target)}`).join(', ')}`);
       setWorkspace('design'); await wait(30); const r = Gen.run(0, true); await wait(150); ok('Generate: a podium-and-tower proposal from the brief', project.blocks.filter((b) => b.use !== 'core').length >= 5 && !!project.param && project.param.mode === 'gen', `${r.label}: ${r.height.toFixed(1)} m, ${r.storeys} storeys, FSR ${r.fsr.toFixed(2)}, ${r.conflicts.length} conflict(s), generated ${fmt0(r.genTotal)} of ${fmt0(r.reqTotal)} m²`);
       const before = window.Iterate ? Iterate.save('Generated option') : null;
@@ -746,7 +774,7 @@
     document.body.dataset.opstest = out.join(' | '); console.log('OPS ' + out.join(' | '));
   }
 
-  const api = { project: () => project, massProject, state, selectPair, evaluateProject, currentLevel, planFor, selected, select, edit, travelLimit, sectionBlock, snapZ, context, daylight, envelope, focus, tip, limits, liveWarnings, rowTouches, rows: () => rows };
+  const api = { project: () => project, massProject, state, selectPair, pickPair, renderRight, evaluateProject, currentLevel, planFor, selected, select, edit, travelLimit, sectionBlock, snapZ, context, daylight, envelope, focus, tip, limits, liveWarnings, rowTouches, rows: () => rows };
   function boot(saved) {
     if (saved && saved.project) { project = saved.project; Model.syncIds(project); const st = saved.state || {}; for (const k of ['workspace', 'view', 'tool', 'levelKey', 'heat', 'selected', 'secAxis', 'secPos']) if (st[k] !== undefined) state[k] = st[k]; if (st.aids) state.aids = Object.assign({}, DEFAULT_AIDS, st.aids); if (st.snap) state.snap = Object.assign({}, DEFAULT_SNAP, st.snap); }
     if (state.aids.contextOpacity == null) state.aids.contextOpacity = DEFAULT_AIDS.contextOpacity;

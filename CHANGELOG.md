@@ -39,6 +39,10 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 32 (2 Oct 2026): blocks never overlap; fire-separation pair picked in the model
+- No two program blocks may occupy the same space (cores sit inside their tower and are exempt). Every live edit, drag, pull, typed field, arrow key and duplicate runs through `clampOverlap` in app.js: the face or side that moved is held at the neighbour it ran into, and a change that cannot be resolved that way is refused. A `Blocks occupy the same space` check (layout group, fail) catches overlaps in older saved projects.
+- Fire separation between two blocks: the right panel's *Fire separation to another block* box has a *Pick in model* button. While picking, a click in the 3D view only chooses the second block (crosshair cursor, the chosen block outlined); it never moves or resizes anything. Esc or a click on empty space cancels. The dropdown and shift-click still work. The paired block is outlined in the model.
+
 ## Phase 31 (2 Oct 2026): no face arrows; the size popup stays put
 - The arrows drawn on a hovered or dragged face are gone; the tinted face and its outline are the whole affordance.
 - The push/pull and move popup is anchored once, beside the pointer where the operation began, and no longer follows the cursor. It stays there until the operation ends: a click anywhere else applies the drag, Enter applies a typed number, Esc cancels. It is only nudged back inside the view when it grows.
