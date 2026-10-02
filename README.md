@@ -1,9 +1,5 @@
 # Downtown Massing Tool
 
-**Live tool:** https://xubynii.github.io/dtmass/ · Repository: https://github.com/xubynii/dtmass
-
-A browser tool for downtown Vancouver lots: give it a program brief, get an editable tower massing, and see every number checked live against the Downtown Official Development Plan, the Vancouver Building By-law and the Parking By-law, with each clause linked to its source.
-
 ## 1. Purpose
 
 <!-- Write this section yourself (150 words or fewer): what the tool helps someone understand or do, and for whom.
@@ -17,14 +13,6 @@ A browser tool for downtown Vancouver lots: give it a program brief, get an edit
 The tool is a static web page (HTML and JavaScript, no build step, no account).
 
 **Online:** open the live link at the top of this README in Chrome or Edge on a laptop-sized screen. The first load fetches about 7 MB (the downtown context model, the City parcel data and the Rhino reader); after that it is cached.
-
-**Locally:**
-1. Clone or download this repository.
-2. Serve the folder (the page loads files with `fetch`, so it needs a local server, not `file://`):
-   ```
-   python tools/serve.py
-   ```
-   then open http://localhost:8765/index.html (the server roots at `src/`). Any static server works; if you serve the repository root instead, open `src/index.html`.
 
 **Workflow (Site → Design → Check → Compare → Report):**
 1. **Site.** The demo opens on 1189 Howe St. *Change site* opens a map of downtown parcels; click one. Under *Restrictions*, confirm the ODP density area, the ODP height area and any view-cone height: items marked *Needs verification* were guessed from City data and keep every dependent check at "needs verification" until you confirm them. Choose the guideline setback set (Downtown South residential street, retail street build-to, or none).
