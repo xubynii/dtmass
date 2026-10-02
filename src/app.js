@@ -200,7 +200,7 @@
 
   /* ---------- viewport chrome ---------- */
   const HINT = {
-    select: { '3d': 'Drag a block to move it · drag a face of the selected block to resize it, or click the face to type a size · drag empty space to orbit', plan: 'Drag a block to move it · drag a handle of the selected block to resize it · drag empty space to pan', section: 'Drag a block to restack it · drag empty space to pan' },
+    select: { '3d': 'Drag a block to move it on its floor · on the selected block, pull a face along its arrow to resize it (click the face to type a size) · drag empty space to orbit', plan: 'Drag a block to move it · drag a handle of the selected block to resize it · drag empty space to pan', section: 'Drag a block to restack it · drag empty space to pan' },
     push: { '3d': '<b>Push/Pull</b> · Hover a face, then drag it. The opposite face stays fixed. Click a face to type an exact value.', plan: '<b>Push/Pull</b> · Drag an edge or corner handle of the selected block.', section: '<b>Push/Pull</b> works in 3D and Plan. Section shows heights.' },
     move: { '3d': '<b>Move</b> · Drag an arrow to slide along one axis, or the square to move freely. Size does not change.', plan: '<b>Move</b> · Drag a block across the site.', section: '<b>Move</b> · Drag a block up or down to restack it.' },
   };
@@ -715,7 +715,7 @@
     t = T(); const w2 = t.w; east = Scene3D.screenOf(t.x + t.w, t.y + t.d / 2, t.z0 + 10); ev('pointermove', east, { buttons: 0 }); await wait(20); ev('pointerdown', east); ev('pointerup', east); await wait(30); key('-'); key('2'); key('.'); key('5'); key('Enter'); await wait(80);
     ok('exact offset by typing', Math.abs(T().w - (w2 - 2.5)) < 1e-6, `width ${w2} → ${T().w} (typed offset −2.5)`);
     t = T(); const bx = t.x, by = t.y, bw = t.w, bd = t.d, bz = t.z0, core0 = project.blocks.find((b) => b.name === 'Core'), cx0 = core0.x; setTool('select'); select(t.id); await wait(60); h0 = H();
-    { const ga = Scene3D.screenOf(t.x + t.w * 0.5, t.y, t.z0 + 10); await drag(ga, { x: ga.x + 70, y: ga.y }); }
+    { const ga = Scene3D.screenOf(t.x + t.w * 0.5, t.y, t.z0 + 10), gt = Scene3D.screenOf(t.x + t.w * 0.5 + 8, t.y, t.z0 + 10); await drag(ga, { x: gt.x, y: gt.y }); }
     ok('drag the block body to move it on its own floor (no arrows)', T().w === bw && T().d === bd && (T().x !== bx || T().y !== by) && T().z0 === bz, `x ${bx} → ${T().x}, y ${by} → ${T().y}, base ${bz} kept, size ${T().w} × ${T().d}`); ok('one undo step for the move', H() === h0 + 1); ok('the core moves with its tower', Math.abs((project.blocks.find((b) => b.name === 'Core').x - cx0) - (T().x - bx)) < 0.02, `core x ${cx0} → ${project.blocks.find((b) => b.name === 'Core').x}`);
     t = T(); const before = JSON.stringify({ x: t.x, y: t.y, w: t.w, d: t.d, floors: t.floors }); setTool('push'); await wait(50); h0 = H(); top = Scene3D.screenOf(t.x + t.w / 2, t.y + t.d / 2, Model.blockTop(t)); ev('pointermove', top, { buttons: 0 }); await wait(20); ev('pointerdown', top); for (let i = 1; i <= 6; i++) { ev('pointermove', { x: top.x, y: top.y - i * 15 }); await wait(10); } key('Escape'); ev('pointerup', { x: top.x, y: top.y - 90 }); await wait(60);
     t = T(); ok('Esc cancels and restores', JSON.stringify({ x: t.x, y: t.y, w: t.w, d: t.d, floors: t.floors }) === before && H() === h0);

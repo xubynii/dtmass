@@ -39,6 +39,10 @@ Open http://localhost:8765/index.html. Hash shortcuts: `#plan`, `#section`, `#3d
 - **Aids bar** under the stage: Daylight façades, Height limit, Existing buildings, Shadow + hour slider, Floor lines, Dimensions, Fit site, Zoom out, legend.
 - **Analysis page**: the selected block's editor, the daylight fan diagram (`daydiag.js`) and the checks that touch the block.
 
+## Phase 29 (2 Oct 2026): no handles; flat street names
+- The face dots are gone. On the selected block the hovered face highlights with its arrow; pulling that face along the arrow pushes or pulls it, sliding it sideways moves the block, pulling the roof changes the height. Any other block moves when dragged. The floor level still changes only in the side panel.
+- Street names lie flat on the ground, reading along the street: the site's own streets get a large name centred on the block face, 9 m into the street; nearby streets get a smaller muted name at mid-length. Buildings occlude them.
+
 ## Phase 28 (2 Oct 2026): direct dragging, floors fixed, best typical layout per program
 - No move arrows: dragging the body of any block moves it on its own floor (base elevation never changes by dragging, in 3D or in Section); the selected block shows small face handles (four sides and roof) that push or pull that face. Floor level changes only through the side panel: Base elevation, or the new "Starts at" selector (ground, or the top of a named block).
 - Plan engine (`plans.js`): for corridor uses (residential, hotel, office) four corridor layouts are generated per level (adaptive ring with spurs, full ring with spurs, adaptive ring, full ring) and scored by leasable share with penalties for travel over the limit, unreachable rooms, dead ends over 6 m, deep or oversize units and corridor area; the best is kept and the plan notes which layout won and why. Retail, restaurant and parking keep their single typical layout.

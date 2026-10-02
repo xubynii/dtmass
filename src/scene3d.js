@@ -62,6 +62,10 @@ window.Scene3D = (function () {
     for (const f of list) { let g; try { g = prismGeom(f.poly, Math.max(0.5, f.h - (f.z0 || 0))); if (f.z0) g.translate(0, f.z0, 0); } catch (e) { continue; } const a = g.attributes.position.array, idx = g.index; if (idx) { for (let i = 0; i < idx.count; i++) { const k = idx.array[i] * 3; pos.push(a[k], a[k + 1], a[k + 2]); } } else for (let i = 0; i < a.length; i++) pos.push(a[i]); if (edgeMat) { const e = new THREE.EdgesGeometry(g, 20).attributes.position.array; for (let i = 0; i < e.length; i++) epos.push(e[i]); } g.dispose(); }
     const grp = new THREE.Group(); if (!pos.length) return grp; const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); mg.computeVertexNormals(); grp.add(new THREE.Mesh(mg, mat)); if (edgeMat && epos.length) { const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.Float32BufferAttribute(epos, 3)); grp.add(new THREE.LineSegments(eg, edgeMat)); } return grp; }
   function label(text, x, y, z, group = staticG, color) { const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d'); g.font = '500 34px "Inter", sans-serif'; g.fillStyle = color || css('--muted'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 48); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false })); const k = 1.3 * Math.max(0.8, sph.r / 160); sp.scale.set(k * 5.33, k, 1); sp.position.copy(T3(x, y, z)); group.add(sp); }
+  /* a street name lying flat on the ground, reading along the street; `ang` is the street direction in plan (radians from +x toward +y) */
+  function flatLabel(text, x, y, ang, size = 4, group = staticG, color) { const c = document.createElement('canvas'); c.width = 1024; c.height = 160; const g = c.getContext('2d'); g.font = '600 112px "Inter", sans-serif'; g.fillStyle = color || css('--ink2'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 512, 84);
+    let a = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); if (a > Math.PI / 2 && a < Math.PI * 1.5) a += Math.PI; // keep the text readable from the south
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; const m = new THREE.Mesh(new THREE.PlaneGeometry(size * 1024 / 160, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.rotation.set(-Math.PI / 2, a, 0, 'YXZ'); m.position.copy(T3(x, y, 0.3)); m.renderOrder = 6; group.add(m); }
   const dispose = (grp) => { grp.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); grp.clear(); };
 
   /* ---------- static layer: ground, streets, parks, surrounding city, site boundary ---------- */
@@ -75,7 +79,7 @@ window.Scene3D = (function () {
     staticG.add(ribbon(sitePoly, 0.06, 0.45, new THREE.MeshBasicMaterial({ color: col('--site-line'), side: THREE.DoubleSide })));
     if (cx && opacity > 0.01) {
       const rpos = []; const strip = (pts, w) => { for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.5) continue; const nx = -(b[1] - a[1]) / L * w / 2, ny = (b[0] - a[0]) / L * w / 2; const P = (x, y) => [x, -0.03, -y]; rpos.push(...P(a[0] + nx, a[1] + ny), ...P(b[0] + nx, b[1] + ny), ...P(b[0] - nx, b[1] - ny), ...P(a[0] + nx, a[1] + ny), ...P(b[0] - nx, b[1] - ny), ...P(a[0] - nx, a[1] - ny)); } };
-      const seen = new Set(); for (const st of cx.streets) { strip(st.pts, 18); const mid = st.pts[Math.floor(st.pts.length / 2)]; if (A.streetNames && st.name && !seen.has(st.name) && Math.hypot(mid[0] - s.w / 2, mid[1] - s.d / 2) < 110) { seen.add(st.name); label(st.name.replace(/^\d+(-\d+)? /, ''), mid[0], mid[1], 0.3); } }
+      const seen = new Set(), mine = new Set((s.edges || []).filter((e) => e.kind === 's' && e.name).map((e) => e.name)); for (const st of cx.streets) { strip(st.pts, 18); const i = Math.max(0, Math.floor(st.pts.length / 2) - 1), a0 = st.pts[i], a1 = st.pts[Math.min(st.pts.length - 1, i + 1)], mid = st.pts[Math.floor(st.pts.length / 2)]; if (A.streetNames && st.name && !seen.has(st.name) && !mine.has(st.name) && Math.hypot(mid[0] - s.w / 2, mid[1] - s.d / 2) < 110) { seen.add(st.name); flatLabel(st.name.replace(/^\d+(-\d+)? /, ''), mid[0], mid[1], Math.atan2(a1[1] - a0[1], a1[0] - a0[0]), 3.2, staticG, css('--muted')); } }
       for (const l of cx.lanes || []) strip(l, 6);
       if (rpos.length) { const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rpos, 3)); rg.computeVertexNormals(); staticG.add(new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ color: col('--street'), side: THREE.DoubleSide }))); }
       const pk = new THREE.MeshLambertMaterial({ color: col('--park'), transparent: true, opacity: 0.6, side: THREE.DoubleSide });
@@ -83,7 +87,8 @@ window.Scene3D = (function () {
       if (cx.footAll) { const nb = new THREE.MeshLambertMaterial({ color: col('--context'), transparent: opacity < 0.99, opacity, depthWrite: true }), ne = new THREE.LineBasicMaterial({ color: col('--context-edge'), transparent: true, opacity: Math.min(0.75, opacity * 0.7) }); const g = mergedPrisms(cx.footAll, nb, ne); g.name = 'context'; staticG.add(g);
         if (A.buildingNames) { const named = cx.footAll.filter((b) => b.name && b.h >= 20).map((b) => ({ b, c: Site.centroid(b.poly) })).filter((x) => Math.hypot(x.c[0] - s.w / 2, x.c[1] - s.d / 2) < 260).sort((p, q) => q.b.h - p.b.h).slice(0, 20); const seenN = new Set(); for (const x of named) { if (seenN.has(x.b.name)) continue; seenN.add(x.b.name); label(x.b.name, x.c[0], x.c[1], x.b.h + 3); } } }
     }
-    if (A.streetNames) { if (s.edges) { const fe = s.edges.find((e) => e.front); if (fe) label('Front · ' + (fe.name || 'street').replace(/^\d+(-\d+)? /, ''), (fe.a[0] + fe.b[0]) / 2, (fe.a[1] + fe.b[1]) / 2 - 4, 0.3, staticG, css('--fg')); } else label('Street', s.w / 2, -5, 0.3, staticG, css('--fg')); }
+    if (A.streetNames) { /* the site's own streets: one large name per street edge, centred on the block face and lying in the street */
+      const edges = window.Rules && Rules.siteEdges ? Rules.siteEdges(s).filter((e) => e.kind === 'street') : []; if (edges.length) for (const e of edges) { const name = (e.name || (s.streets && s.streets[0]) || 'Street').replace(/^\d+(-\d+)? /, ''); flatLabel(name, (e.a[0] + e.b[0]) / 2 - e.nx * 9, (e.a[1] + e.b[1]) / 2 - e.ny * 9, Math.atan2(e.b[1] - e.a[1], e.b[0] - e.a[0]), 4.5, staticG, css('--fg')); } else flatLabel('Street', s.w / 2, -9, 0, 4.5, staticG, css('--fg')); }
     if (A.entourage) { const fig = new THREE.MeshLambertMaterial({ color: col('--accent-line') }), body = new THREE.CylinderGeometry(0.2, 0.24, 1.35, 8), head = new THREE.SphereGeometry(0.17, 10, 8); let k = 0;
       const edges = s.edges ? s.edges.filter((e) => e.kind !== 'lane') : [{ a: [0, 0], b: [s.w, 0] }];
       for (const e of edges) { const dx = e.b[0] - e.a[0], dy = e.b[1] - e.a[1], L = Math.hypot(dx, dy) || 1, nx = dy / L, ny = -dx / L; for (let t = 4; t < L - 2; t += 9) { k++; const off = 2.2 + ((k * 37) % 10) / 10 * 1.6, x = e.a[0] + dx / L * (t + ((k * 13) % 5)) + nx * off, y = e.a[1] + dy / L * (t + ((k * 13) % 5)) + ny * off; const b1 = new THREE.Mesh(body, fig); b1.position.copy(T3(x, y, 0.68)); const h1 = new THREE.Mesh(head, fig); h1.position.copy(T3(x, y, 1.55)); staticG.add(b1, h1); } } }
@@ -128,7 +133,6 @@ window.Scene3D = (function () {
     }
     for (const c of pr.blocks) if (!c.hidden && c.use === 'core' && A.coreLabels && !(sel && sel.id === c.id)) annots.push({ p: T3(c.x + c.w / 2, c.y + c.d / 2, Model.blockTop(c) + 0.3), text: c.name || 'Core', cls: 'core' });
     for (const r of pr.ramps) { const rr = Plans.rampRect(r); const zAt = (x, y) => { const t = r.dir === 'N' ? (y - rr.y) / rr.d : r.dir === 'S' ? 1 - (y - rr.y) / rr.d : r.dir === 'E' ? (x - rr.x) / rr.w : 1 - (x - rr.x) / rr.w; return r.zTop - t * (r.zTop - r.zBottom); }; const pts = [[rr.x, rr.y], [rr.x + rr.w, rr.y], [rr.x + rr.w, rr.y + rr.d], [rr.x, rr.y + rr.d]].map(([x, y]) => T3(x, y, zAt(x, y))); const g = new THREE.BufferGeometry().setFromPoints([pts[0], pts[1], pts[2], pts[0], pts[2], pts[3]]); g.computeVertexNormals(); const isSel = sel && sel.id === r.id; const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: isSel ? col('--accent') : col('--ramp'), transparent: true, opacity: 0.65, side: THREE.DoubleSide })); m.userData.id = r.id; m.userData.ramp = true; blockG.add(m); blockMeshes.set(r.id, m); }
-    if (tool() === 'select' && sel && sel.len == null && !sel.hidden && !sel.locked) addFaceHandles(sel);
     buildFx();
   }
   const hOf = (b) => (b.use === 'core' ? b.f2f : b.floors * b.f2f);
@@ -193,63 +197,6 @@ window.Scene3D = (function () {
         else pts = [T3(-10, -10, gd.v), T3(s.w + 10, -10, gd.v), T3(s.w + 10, -10, gd.v), T3(s.w + 10, s.d + 10, gd.v), T3(s.w + 10, s.d + 10, gd.v), T3(-10, s.d + 10, gd.v), T3(-10, s.d + 10, gd.v), T3(-10, -10, gd.v)];
         const l = segs(pts, dm); l.renderOrder = 9; fxG.add(l); } }
   }
-  /* face handles on the selected block: a small disc at the centre of each side face and of the roof. Dragging a handle pushes or
-     pulls that face; dragging anywhere else on the block moves it on its own floor (the base elevation never changes by dragging). */
-  function addFaceHandles(b) {
-    const acc = col('--accent'), ink = col('--fg'), r = Math.max(0.55, sph.r * 0.009);
-    const hot = (k) => (hover && hover.gizmo === 'face:' + k) || (op && op.kind === 'push' && op.face === k);
-    for (const k of ['x+', 'x-', 'n+', 's-', 'top']) { const c = faceCentre(b, k), n = FACE[k].n; const disc = new THREE.Mesh(new THREE.CircleGeometry(r, 20), new THREE.MeshBasicMaterial({ color: hot(k) ? acc : col('--paper'), transparent: true, opacity: 0.95, depthTest: false, side: THREE.DoubleSide })); disc.position.copy(T3(c[0] + n[0] * 0.08, c[1] + n[1] * 0.08, c[2] + n[2] * 0.08)); disc.lookAt(disc.position.clone().add(T3(n[0], n[1], n[2]))); disc.renderOrder = 11; disc.userData.gizmo = 'face:' + k; disc.userData.face = k; blockG.add(disc); gizmo.push(disc);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.78, r, 20), new THREE.MeshBasicMaterial({ color: hot(k) ? acc : ink, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide })); ring.position.copy(disc.position); ring.quaternion.copy(disc.quaternion); ring.renderOrder = 12; blockG.add(ring); }
-  }
-  function annotate(b) {
-    const h = hOf(b), top = b.z0 + h, A = app.state.aids, k = op && op.id === b.id ? op : null;
-    const zb = Math.max(b.z0, 0) + 0.15, off = Math.max(2.5, Math.min(6, Math.max(b.w, b.d) * 0.12));
-    if (k && k.kind === 'push' && k.face !== 'top') { const hw = k.face === 'x+' || k.face === 'x-', hd = !hw; const pw = dimLine([b.x, b.y, zb], [b.x + b.w, b.y, zb], [0, -off, 0], hw), pd = dimLine([b.x + b.w, b.y, zb], [b.x + b.w, b.y + b.d, zb], [off, 0, 0], hd); annots.push({ p: pw, text: `${b.w.toFixed(2)} m`, cls: hw ? 'hot' : '' }); annots.push({ p: pd, text: `${b.d.toFixed(2)} m`, cls: hd ? 'hot' : '' }); return; }
-    if (k && k.kind === 'push' && k.face === 'top') { const ph = dimLine([b.x + b.w, b.y, b.z0], [b.x + b.w, b.y, top], [off * 0.7, -off * 0.7, 0], true); annots.push({ p: ph, text: b.use === 'core' ? `${h.toFixed(2)} m` : `${b.floors} storeys · ${h.toFixed(1)} m`, cls: 'hot', dx: 14 }); return; }
-    if (k && k.kind === 'move') { annots.push({ p: T3(b.x + b.w / 2, b.y + b.d / 2, Math.max(b.z0, 0) + 0.2), text: `Δx ${fmtM(b.x - k.start.x)} · Δy ${fmtM(b.y - k.start.y)}`, cls: 'hot', dy: 26 }); return; }
-    if (A.dims && !op) annots.push({ p: T3(b.x + b.w / 2, b.y, Math.max(b.z0, 0) + 0.2), text: `${b.w} × ${b.d} m`, cls: '' });
-    if (b.use === 'core' && (A.coreLabels || true)) annots.push({ p: T3(b.x + b.w / 2, b.y + b.d / 2, top + 0.3), text: b.name || 'Core', cls: 'core' });
-  }
-  function drawDaylight(b, bands) { const pass = col('--pass'), warn = col('--review'), fail = col('--fail'), pos = [], cc = []; const push = (k, ...v) => { for (let i = 0; i < v.length; i += 3) { pos.push(v[i], v[i + 1], v[i + 2]); cc.push(k.r, k.g, k.b); } };
-    for (const band of bands) { const z0 = b.z0 + band.f0 * b.f2f + 0.15, z1 = b.z0 + (band.f1 + 1) * b.f2f - 0.15; for (const F of band.faces) { const o = 0.08, g = Math.min(0.25, F.ds * 0.12); for (const s of F.samples) { if (s.interior) continue; const k = s.ok ? pass : s.d >= 3.7 ? warn : fail, a0 = s.a - F.ds / 2 + g, a1 = s.a + F.ds / 2 - g; const P = (x, y, z) => [x, z, -y];
-      if (F.ax === 'x') { const y = F.c + F.ny * o; push(k, ...P(a0, y, z0), ...P(a1, y, z0), ...P(a1, y, z1), ...P(a0, y, z0), ...P(a1, y, z1), ...P(a0, y, z1)); } else { const x = F.c + F.nx * o; push(k, ...P(x, a0, z0), ...P(x, a1, z0), ...P(x, a1, z1), ...P(x, a0, z0), ...P(x, a1, z1), ...P(x, a0, z1)); } } } }
-    if (!pos.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3)); blockG.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }))); }
-
-  /* ---------- effects layer: face highlight, start-geometry ghost, alignment guides ---------- */
-  function faceQuad(b, key, inset = 0) { const h = hOf(b), z0 = b.z0, z1 = b.z0 + h, e = 0.06; let pts;
-    if (key === 'x+') pts = [[b.x + b.w + e, b.y, z0], [b.x + b.w + e, b.y + b.d, z0], [b.x + b.w + e, b.y + b.d, z1], [b.x + b.w + e, b.y, z1]];
-    else if (key === 'x-') pts = [[b.x - e, b.y, z0], [b.x - e, b.y + b.d, z0], [b.x - e, b.y + b.d, z1], [b.x - e, b.y, z1]];
-    else if (key === 'n+') pts = [[b.x, b.y + b.d + e, z0], [b.x + b.w, b.y + b.d + e, z0], [b.x + b.w, b.y + b.d + e, z1], [b.x, b.y + b.d + e, z1]];
-    else if (key === 's-') pts = [[b.x, b.y - e, z0], [b.x + b.w, b.y - e, z0], [b.x + b.w, b.y - e, z1], [b.x, b.y - e, z1]];
-    else pts = [[b.x, b.y, z1 + e], [b.x + b.w, b.y, z1 + e], [b.x + b.w, b.y + b.d, z1 + e], [b.x, b.y + b.d, z1 + e]];
-    void inset; return pts.map((p) => T3(p[0], p[1], p[2])); }
-  function faceCentre(b, key) { const h = hOf(b), zc = b.z0 + h / 2; if (key === 'x+') return [b.x + b.w, b.y + b.d / 2, zc]; if (key === 'x-') return [b.x, b.y + b.d / 2, zc]; if (key === 'n+') return [b.x + b.w / 2, b.y + b.d, zc]; if (key === 's-') return [b.x + b.w / 2, b.y, zc]; return [b.x + b.w / 2, b.y + b.d / 2, b.z0 + h]; }
-  function buildFx() {
-    dispose(fxG); const pr = app.project(), acc = col('--accent');
-    const showFace = (b, key, strong) => { const q = faceQuad(b, key); const g = new THREE.BufferGeometry().setFromPoints([q[0], q[1], q[2], q[0], q[2], q[3]]); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col('--accent'), transparent: true, opacity: strong ? 0.2 : 0.13, side: THREE.DoubleSide, depthTest: false, depthWrite: false })); m.renderOrder = 8; fxG.add(m);
-      const ol = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(q), new THREE.LineBasicMaterial({ color: acc, depthTest: false })); ol.renderOrder = 9; fxG.add(ol);
-      const c = faceCentre(b, key), n = FACE[key].n, s = Math.max(1.2, sph.r * 0.018); const dir = T3(n[0], n[1], n[2]).normalize(); const arrow = new THREE.ArrowHelper(dir, T3(c[0] + n[0] * 0.2, c[1] + n[1] * 0.2, c[2] + n[2] * 0.2), s * 2.6, acc.getHex(), s * 1.1, s * 0.7); arrow.traverse((o) => { if (o.material) { o.material.depthTest = false; o.renderOrder = 10; } }); fxG.add(arrow);
-      if (key !== 'top') { const back = T3(n[0], n[1], n[2]).normalize().negate(); const a2 = new THREE.ArrowHelper(back, T3(c[0] - n[0] * 0.2, c[1] - n[1] * 0.2, c[2] - n[2] * 0.2), s * 1.2, acc.getHex(), s * 0.6, s * 0.45); a2.traverse((o) => { if (o.material) { o.material.depthTest = false; o.material.transparent = true; o.material.opacity = 0.5; o.renderOrder = 10; } }); fxG.add(a2); } };
-    if (op && op.kind === 'push') { const b = pr.blocks.find((x) => x.id === op.id); if (b) showFace(b, op.face, true); }
-    else if (hover && hover.face && (tool() === 'push' || (tool() === 'select' && app.selected() && hover.id === app.selected().id && !app.selected().locked))) { const b = pr.blocks.find((x) => x.id === hover.id); if (b) showFace(b, hover.face, false); }
-    if (op) { const s0 = op.start, h0 = s0.use === 'core' ? s0.f2f : s0.floors * s0.f2f; const ghost = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s0.w, h0, s0.d)), new THREE.LineDashedMaterial({ color: col('--muted'), dashSize: 0.8, gapSize: 0.5, depthTest: false, transparent: true, opacity: 0.8 })); ghost.position.set(s0.x + s0.w / 2, s0.z0 + h0 / 2, -(s0.y + s0.d / 2)); ghost.computeLineDistances(); ghost.renderOrder = 7; fxG.add(ghost);
-      for (const gd of op.guides || []) { const dm = new THREE.LineDashedMaterial({ color: acc, dashSize: 1, gapSize: 0.7, depthTest: false }); let pts; const s = pr.site;
-        if (gd.axis === 'x') pts = [T3(gd.v, -15, 0.1), T3(gd.v, s.d + 15, 0.1), T3(gd.v, gd.y || 0, 0.1), T3(gd.v, gd.y || 0, gd.top || 30)];
-        else if (gd.axis === 'y') pts = [T3(-15, gd.v, 0.1), T3(s.w + 15, gd.v, 0.1), T3(gd.x || 0, gd.v, 0.1), T3(gd.x || 0, gd.v, gd.top || 30)];
-        else pts = [T3(-10, -10, gd.v), T3(s.w + 10, -10, gd.v), T3(s.w + 10, -10, gd.v), T3(s.w + 10, s.d + 10, gd.v), T3(s.w + 10, s.d + 10, gd.v), T3(-10, s.d + 10, gd.v), T3(-10, s.d + 10, gd.v), T3(-10, -10, gd.v)];
-        const l = segs(pts, dm); l.renderOrder = 9; fxG.add(l); } }
-  }
-  function addMoveGizmo(b) {
-    const z = Math.max(b.z0, 0) + 0.15, cx = b.x + b.w / 2, cy = b.y + b.d / 2, L = Math.max(6, Math.min(b.w, b.d) * 0.55 + 4), s = Math.max(0.9, sph.r * 0.014), acc = col('--accent'), ink = col('--fg');
-    const hot = (k) => (hover && hover.gizmo === k) || (op && op.kind === 'move' && op.axis === k);
-    const arrow = (k, dir, c) => { const a = new THREE.ArrowHelper(dir, T3(cx, cy, z), L, (hot(k) ? acc : c).getHex(), s * 1.6, s * 1.0); a.traverse((o) => { if (o.material) { o.material.depthTest = false; o.renderOrder = 11; } }); blockG.add(a);
-      const hit = new THREE.Mesh(new THREE.CylinderGeometry(s * 1.6, s * 1.6, L, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false, depthWrite: false })); hit.position.copy(T3(cx, cy, z).add(dir.clone().multiplyScalar(L / 2))); hit.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); hit.userData.gizmo = k; blockG.add(hit); gizmo.push(hit); };
-    arrow('x', T3(1, 0, 0).normalize(), ink); arrow('y', T3(0, 1, 0).normalize(), ink);
-    const ps = Math.max(2.2, L * 0.32); const plane = new THREE.Mesh(new THREE.PlaneGeometry(ps, ps), new THREE.MeshBasicMaterial({ color: acc, transparent: true, opacity: hot('plane') ? 0.55 : 0.3, side: THREE.DoubleSide, depthTest: false })); plane.rotation.x = -Math.PI / 2; plane.position.copy(T3(cx + ps * 0.75, cy + ps * 0.75, z)); plane.renderOrder = 11; plane.userData.gizmo = 'plane'; blockG.add(plane); gizmo.push(plane);
-    const pe = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([T3(cx + ps * 0.25, cy + ps * 0.25, z), T3(cx + ps * 1.25, cy + ps * 0.25, z), T3(cx + ps * 1.25, cy + ps * 1.25, z), T3(cx + ps * 0.25, cy + ps * 1.25, z)]), new THREE.LineBasicMaterial({ color: acc, depthTest: false })); pe.renderOrder = 12; blockG.add(pe);
-  }
-
-  /* ---------- DOM annotations and the operation readout ---------- */
   function placeAnnots() {
     const layer = dom.annot; if (!layer) return; const r = canvas.getBoundingClientRect(); const html = [];
     for (const a of annots) { const v = a.p.clone().project(camera); if (v.z > 1 || v.z < -1) continue; const x = (v.x + 1) / 2 * r.width + (a.dx || 0), y = (1 - v.y) / 2 * r.height + (a.dy || 0); if (x < -50 || y < -20 || x > r.width + 50 || y > r.height + 20) continue; html.push(`<span class="annot ${a.cls || ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px">${escH(a.text)}</span>`); }
@@ -353,15 +300,14 @@ window.Scene3D = (function () {
     if (op) { if (op.entry.active || !drag) { commitOp(); } return; }
     if (e.button === 2 || e.button === 1) { drag = { mode: 'pan', x: e.clientX, y: e.clientY }; return; }
     const pr = app.project(), sel = app.selected();
-    if (tool() === 'select' && sel && gizmo.length) { const gh = ray.intersectObjects(gizmo); if (gh.length) { if (sel.locked) { app.tip(`${sel.name} is locked. Unlock it in its properties to change it.`); drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } beginPush(sel, gh[0].object.userData.face); drag = { mode: 'op' }; return; } }
     const hit = blockHit();
     if (hit) { const b = pr.blocks.find((x) => x.id === hit.id);
       if (e.shiftKey && sel && sel.id !== hit.id && app.selectPair) { app.selectPair(hit.id); drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; }
       if (!sel || sel.id !== hit.id) app.select(hit.id);
       if (b && tool() === 'push' && hit.face) { if (b.locked) { app.tip(`${b.name} is locked. Unlock it in its properties to change it.`); drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } beginPush(b, hit.face); drag = { mode: 'op' }; return; }
       if (b && tool() === 'move') { if (b.locked) { app.tip(`${b.name} is locked. Unlock it in its properties to move it.`); drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } beginMove(b, 'plane'); drag = { mode: 'op' }; return; }
-      /* Select: dragging the body of any block moves it on its floor; the face handles of the selected block push or pull. A plain click only selects. */
-      if (b && tool() === 'select') { if (b.locked) { drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } drag = { mode: 'pending', kind: 'move', b, face: hit.face, x: e.clientX, y: e.clientY, down: { clientX: e.clientX, clientY: e.clientY } }; return; }
+      /* Select: a drag moves the block on its floor. On the already selected block, pulling a face along its own direction (the arrow shown on hover) pushes or pulls that face instead, and pulling the roof changes the height. A plain click only selects. */
+      if (b && tool() === 'select') { if (b.locked) { drag = { mode: 'orbit', x: e.clientX, y: e.clientY, picked: true }; return; } const was = !!(sel && sel.id === hit.id); drag = { mode: 'pending', kind: 'move', was, b, face: hit.face, x: e.clientX, y: e.clientY, down: { clientX: e.clientX, clientY: e.clientY } }; return; }
       drag = { mode: 'orbit', x: e.clientX, y: e.clientY, moved: false, picked: true }; return; }
     drag = { mode: 'orbit', x: e.clientX, y: e.clientY, moved: false };
   }
@@ -369,12 +315,14 @@ window.Scene3D = (function () {
     ptr(e);
     if (op && drag && drag.mode === 'op') { dragOp(e); return; }
     if (op) { placeReadout(); return; }
-    if (drag && drag.mode === 'pending') { if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return; const d = drag; ptr(d.down); if (d.kind === 'push') beginPush(d.b, d.face); else beginMove(d.b, 'plane'); drag = { mode: 'op' }; ptr(e); if (op) dragOp(e); return; }
+    if (drag && drag.mode === 'pending') { if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return; const d = drag; let kind = d.kind;
+      if (d.was && d.face) { if (d.face === 'top') kind = 'push'; else { const c = faceCentre(d.b, d.face), n = FACE[d.face].n, p0 = screenOf(c[0], c[1], c[2]), p1 = screenOf(c[0] + n[0] * 5, c[1] + n[1] * 5, c[2] + n[2] * 5); const t = d.face === 'x+' || d.face === 'x-' ? [0, 1, 0] : [1, 0, 0], p2 = screenOf(c[0] + t[0] * 5, c[1] + t[1] * 5, c[2]); const nx = p1.x - p0.x, ny = p1.y - p0.y, nl = Math.hypot(nx, ny) || 1, tx = p2.x - p0.x, ty = p2.y - p0.y, tl = Math.hypot(tx, ty) || 1, mx = e.clientX - d.x, my = e.clientY - d.y, ml = Math.hypot(mx, my) || 1; const dn = Math.abs((nx * mx + ny * my) / (nl * ml)), dt = Math.abs((tx * mx + ty * my) / (tl * ml)); if (dn > dt * 1.15) kind = 'push'; } }
+      ptr(d.down); if (kind === 'push') beginPush(d.b, d.face); else beginMove(d.b, 'plane'); drag = { mode: 'op' }; ptr(e); if (op) dragOp(e); return; }
     if (!drag) { // hover feedback
-      let h = null; if (tool() === 'select' && gizmo.length) { const gh = ray.intersectObjects(gizmo); if (gh.length) h = { gizmo: gh[0].object.userData.gizmo, face: gh[0].object.userData.face }; }
+      let h = null;
       if (!h) { const bh = blockHit(); if (bh) h = { id: bh.id, face: bh.face }; }
       const key = h ? `${h.gizmo || ''}${h.id || ''}${h.face || ''}` : '', prev = hover ? `${hover.gizmo || ''}${hover.id || ''}${hover.face || ''}` : '';
-      const rs = (f) => (f === 'top' ? 'ns-resize' : f === 'x+' || f === 'x-' ? 'ew-resize' : 'ns-resize'); canvas.style.cursor = h && h.gizmo ? rs(h.face) : h ? (tool() === 'push' && h.face ? rs(h.face) : tool() === 'move' || tool() === 'select' ? 'move' : 'pointer') : 'grab';
+      const rs = (f) => (f === 'top' ? 'ns-resize' : f === 'x+' || f === 'x-' ? 'ew-resize' : 'ns-resize'); const selNow = app.selected(); canvas.style.cursor = h ? (tool() === 'push' && h.face ? rs(h.face) : tool() === 'select' && h.face === 'top' && selNow && h.id === selNow.id ? 'ns-resize' : tool() === 'move' || tool() === 'select' ? 'move' : 'pointer') : 'grab';
       if (key !== prev) { hover = h; if (h && h.gizmo) buildBlocks(); else buildFx(); frame(); } return; }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; if (Math.abs(dx) + Math.abs(dy) > 1) drag.moved = true; const k = sph.r / 650;
     if (drag.mode === 'orbit') { sph.theta -= dx * 0.006; sph.phi = Math.min(1.5, Math.max(0.12, sph.phi - dy * 0.006)); } else if (drag.mode === 'pan') { const dir = new THREE.Vector3(); camera.getWorldDirection(dir); const fwd = new THREE.Vector3(dir.x, 0, dir.z).normalize(), right = new THREE.Vector3(-fwd.z, 0, fwd.x); target.x += -right.x * dx * k + fwd.x * dy * k; target.z += -right.z * dx * k + fwd.z * dy * k; }
@@ -382,7 +330,7 @@ window.Scene3D = (function () {
   }
   function onUp() {
     const d = drag; drag = null; canvas.style.cursor = 'default';
-    if (d && d.mode === 'pending') { if (d.kind === 'push' && d.face) { ptr(d.down); beginPush(d.b, d.face); if (op) { op.entry.active = true; renderReadout(); } } return; }
+    if (d && d.mode === 'pending') { if (d.was && d.face && tool() === 'select') { ptr(d.down); beginPush(d.b, d.face); if (op) { op.entry.active = true; renderReadout(); } } return; }
     if (op) { if (!op.moved && op.kind === 'push') { op.entry.active = true; renderReadout(); app.tip(null); return; } if (op.entry.active) return; commitOp(); return; }
     if (d && d.mode === 'orbit' && !d.moved && !d.picked) app.select(null);
   }
@@ -392,6 +340,6 @@ window.Scene3D = (function () {
   function invalidateStatic() { staticKey = null; }
   /* client-pixel position of a model point (used by the scripted interaction test) */
   function screenOf(x, y, z) { const v = T3(x, y, z).project(camera), r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }
-  function gizmoScreen(axis) { const m = gizmo.find((g) => g.userData.gizmo === axis || g.userData.face === axis); if (!m) return null; const v = m.position.clone().project(camera), r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }
+  function gizmoScreen(axis) { const m = gizmo.find((g) => g.userData.gizmo === axis); if (!m) return null; const v = m.position.clone().project(camera), r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }
   return { opInfo: () => (op ? { id: op.id, face: op.face, kind: op.kind } : null), screenOf, gizmoScreen, init, refresh, resize, fitProject, resetView, fitSite: () => fitProject(false), fitDistrict, invalidateStatic, frame, cancelOp, commitOp, busy: () => !!op, available: () => ready };
 })();
